@@ -40,12 +40,29 @@ One question per message, in this order.
    (`<registrar-exception>`); none is the usual answer.
 6. **Go-ahead to publish the inbox page:** a private claude.ai page only the
    owner sees until they share it.
+7. **Go-ahead for the tracker's remote,** once the repository exists: state
+   that the issues and memories will be pushed to `refs/dolt/data` on that
+   repository (where `bd dolt pull` finds them on another machine), with the
+   commands below, and wait for yes. The rename removed the template's own
+   tracker remote from `.beads/config.yaml`, so until this step the tracker
+   is local only.
 
 ## Writes
 
 - **The repository,** if asked for (question 2), and its remote as
-  `origin`. Then the tracker's remote: `bd dolt remote add origin <the
-  repository's URL>` if `bd dolt remote list` shows none.
+  `origin`.
+- **The tracker's remote,** after the yes (question 7), with the project's
+  own repository and never the template's:
+
+  ```bash
+  bd config set sync.remote "git+https://github.com/<owner>/<name>.git"
+  bd dolt remote list    # if it shows none: bd dolt remote add origin <the same URL>
+  bd dolt push
+  ```
+
+  `bd config set` writes `sync.remote` into `.beads/config.yaml`; commit that
+  change. Without a yes, the tracker stays local and a bead says the step is
+  left.
 - **The branch rule,** after the yes (question 3):
 
   ```bash
@@ -105,8 +122,9 @@ One question per message, in this order.
 ## Records
 
 - BS rows: the repository (owner, name, private or not, organization-owned or
-  not); the branch rule, applied on which date, or why not yet; the inbox's
-  URL; the project's own account; the exception, or "none".
+  not); the branch rule, applied on which date, or why not yet; the tracker's
+  remote, or why not yet; the inbox's URL; the project's own account; the
+  exception, or "none".
 
 ## Done when
 
@@ -116,6 +134,8 @@ One question per message, in this order.
   `bd memories` shows the filled memories.
 - The branch rule reads back `local/check-full` and `proof`, or an inbox
   item says what is missing and why.
+- `.beads/config.yaml`'s `sync.remote` names the project's own repository
+  and `bd dolt push` succeeded, or a bead says the step is left.
 - The inbox page opens, and holds one item per owner-only step that applies
   now (each with its bead); or the owner declined it, a BS row says so, and
   the practice is gone as above. A trial adds one item only (`SKILL.md`,

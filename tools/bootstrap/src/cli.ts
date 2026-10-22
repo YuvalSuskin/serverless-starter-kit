@@ -34,6 +34,11 @@ function summary(report: RenameReport): string {
     `Rewrote ${String(report.filesChanged)} files: ${counts}.`,
     ...report.renamedPaths.map(({ from, to }) => `  renamed ${from} -> ${to}`),
   ];
+  if (report.trackerRemote !== undefined) {
+    lines.push(
+      `Removed the template's tracker remote from .beads/config.yaml (${report.trackerRemote}): bd init starts a fresh tracker. Bootstrap step 3 sets the project's own.`,
+    );
+  }
   if (report.thirdParty.length > 0) {
     lines.push(`Left third-party names as they are: ${report.thirdParty.join(", ")}.`);
   }

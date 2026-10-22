@@ -48,6 +48,9 @@ const settings = (command: string) =>
 
 const BINARY = Buffer.from([0, 1, 2, ...Buffer.from("acme"), 0, 255]);
 
+/** The template's own tracker remote, as its published `.beads/config.yaml` names it. */
+const TEMPLATE_REMOTE = "git+https://github.com/YuvalSuskin/serverless-starter-kit.git";
+
 /** A small template: every kind of placeholder the real one holds, committed. */
 function fixture(): string {
   const root = tempDir();
@@ -88,7 +91,7 @@ function fixture(): string {
       "};",
       "",
     ].join("\n"),
-    ".beads/config.yaml": "# Issue prefix\nissue-prefix: acme\n",
+    ".beads/config.yaml": `# Issue prefix\nissue-prefix: acme\nexport:\n    auto: true\nsync:\n    remote: "${TEMPLATE_REMOTE}"\n`,
     ".beads/metadata.json": `{\n  "database": "dolt",\n  "dolt_database": "acme",\n  "project_id": "5f04d4d2-0000"\n}`,
     "infra/aws/github-deploy.yaml": [
       "  AppInitial:",
@@ -196,6 +199,29 @@ describe("renameProject refuses", () => {
     expect(read(root, "package.json")).toContain('"name": "demo"');
   });
 
+  it.each([
+    ["https", "https://github.com/YuvalSuskin/serverless-starter-kit.git"],
+    ["ssh, through a host alias", "github-work:YuvalSuskin/Serverless-Starter-Kit"],
+    ["the tracker remote's own", TEMPLATE_REMOTE],
+  ])("a clone whose origin is the template's repository (%s), in one line", async (_form, url) => {
+    const root = fixture();
+    git(root, "remote", "add", "origin", url);
+    const refusal = renameProject(root, { display: "Demo", slug: "demo" });
+    await expect(refusal).rejects.toThrow(RenameRefused);
+    await expect(refusal).rejects.toThrow(/^[^\n]*origin is the template's repository[^\n]*$/);
+    untouched(root);
+  });
+
+  it("when the template's repository would be named outside the allowlist", async () => {
+    const root = fixture();
+    write(root, { "docs/links.md": "See github.com/YuvalSuskin/serverless-starter-kit.\n" });
+    commitAll(root);
+    await expect(renameProject(root, { display: "Demo", slug: "demo" })).rejects.toThrow(
+      /docs\/links\.md:1/,
+    );
+    untouched(root);
+  });
+
   it("when a placeholder would be left outside the allowlist, before changing a file", async () => {
     const root = fixture();
     write(root, { "src/glued.ts": 'export const odd = "acmeish";\n' });
@@ -239,7 +265,11 @@ describe("renameProject, to demo", () => {
     );
     expect(read(root, "packages/config/eslint.mjs")).toContain("plugins: { demo: { rules: {");
     expect(read(root, "packages/config/eslint.mjs")).toContain('"demo/zod-namespace-import"');
-    expect(read(root, ".beads/config.yaml")).toBe("# Issue prefix\nissue-prefix: demo\n");
+    // The template's tracker remote goes: bd init would adopt the template's issues.
+    expect(read(root, ".beads/config.yaml")).toBe(
+      "# Issue prefix\nissue-prefix: demo\nexport:\n    auto: true\n",
+    );
+    expect(report.trackerRemote).toBe(TEMPLATE_REMOTE);
     // bd init writes a fresh project_id: the template's tracker is not the project's.
     expect(JSON.parse(read(root, ".beads/metadata.json"))).toEqual({
       database: "dolt",
@@ -266,6 +296,29 @@ describe("renameProject, to demo", () => {
     expect(report.filesChanged).toBe(10);
   });
 
+  it.each([
+    [
+      "a flat sync.remote key",
+      "issue-prefix: acme\nsync.remote: 'file:///tpl' # the template's\n",
+      "issue-prefix: demo\n",
+    ],
+    [
+      "a sync block holding more than the remote, which stays",
+      "sync:\n  # where issues go\n  remote: file:///tpl\n  branch: main\nissue-prefix: acme\n",
+      "sync:\n  # where issues go\n  branch: main\nissue-prefix: demo\n",
+    ],
+    ["no remote at all", "issue-prefix: acme\nsync:\n  branch: main\n", undefined],
+  ])("drops the tracker remote from %s", async (_shape, config, after) => {
+    const root = fixture();
+    write(root, { ".beads/config.yaml": config });
+    git(root, "add", ".beads/config.yaml");
+    git(root, "commit", "-q", "-m", "config");
+    const report = await renameProject(root, { display: "Demo", slug: "demo" });
+    const expected = after ?? config.replace("acme", "demo");
+    expect(read(root, ".beads/config.yaml")).toBe(expected);
+    expect(report.trackerRemote).toBe(after === undefined ? undefined : "file:///tpl");
+  });
+
   it("leaves no placeholder outside the allowlist, and every package name valid", async () => {
     const root = fixture();
     await renameProject(root, { display: "Demo", slug: "demo" });
@@ -275,6 +328,33 @@ describe("renameProject, to demo", () => {
         validNpmName((JSON.parse(text) as { name?: unknown }).name),
       );
     }
+  });
+});
+
+describe("leftovers", () => {
+  it("names a tracker remote left in .beads/config.yaml, whatever its URL", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, {
+      ".beads/config.yaml": `${read(root, ".beads/config.yaml")}sync:\n    remote: "file:///elsewhere"\n`,
+    });
+    expect(leftovers(root, { installed: false })).toEqual([
+      {
+        file: ".beads/config.yaml",
+        line: 6,
+        text: 'remote: "file:///elsewhere"',
+      },
+    ]);
+  });
+
+  it("names the template's repository in a tracked file", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, { "docs/links.md": "Forked from Serverless-Starter-Kit.\n" });
+    git(root, "add", "docs/links.md");
+    expect(leftovers(root, { installed: false })).toEqual([
+      { file: "docs/links.md", line: 1, text: "Forked from Serverless-Starter-Kit." },
+    ]);
   });
 });
 
