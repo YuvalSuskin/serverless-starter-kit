@@ -148,8 +148,10 @@ done or deferred), remove what only the template needed, as one change:
   `tools/local-check/src/flows.test.ts`, and its mention in
   `tools/local-check/CLAUDE.md`.
 - **The rename:** in `tools/bootstrap/src/`, `rename.ts`, `rename.test.ts`,
-  `rename-copy.ts`, `cli.ts`, `finish.ts` and `finish.test.ts`; the `rename`
-  script in the root `package.json`; their entries in
+  `rename-copy.ts`, `cli.ts`, `finish.ts`, `finish.test.ts`, `tracker.ts`,
+  `tracker.test.ts`, `tracker-config.ts`, `tracker-remote.test.ts` and
+  `drop-remote.ts`; the `rename` and `tracker:drop-remote` scripts in the root
+  `package.json`; their entries in
   `tools/bootstrap/knip.json`; the `pnpm rename` lines in the root
   `CLAUDE.md` (Build & Test, and the `tools/bootstrap/` line, which becomes
   "pnpm bootstrap:state: where /bootstrap stands") and in `README.md`, whose

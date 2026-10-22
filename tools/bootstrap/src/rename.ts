@@ -7,9 +7,11 @@
 // This file is on its own allowlist: it names the placeholder, and the
 // bootstrap deletes it once the project is named.
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, realpathSync, rmdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmdirSync } from "node:fs";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { dropTrackerRemote, remoteLines } from "./tracker-config.ts";
 
 const PLACEHOLDER = "acme";
 
@@ -27,6 +29,25 @@ export const MARKER = `.${PLACEHOLDER}-template`;
 export const PRIME = "bd prime --hook-json";
 export const PRIME_GUARDED = `{ test -e "$CLAUDE_PROJECT_DIR/${MARKER}" && ! test -e "$CLAUDE_PROJECT_DIR/.beads/embeddeddolt" && ! test -e "$CLAUDE_PROJECT_DIR/.beads/dolt"; } || ${PRIME}`;
 const SETTINGS = ".claude/settings.json";
+
+/**
+ * The template's GitHub repository. A renamed project names it nowhere: the
+ * template's tracker remote least of all, since `bd init` clones a configured
+ * `sync.remote` and the project would adopt the template's issues and prefix,
+ * and later push its own into the template.
+ */
+const TEMPLATE_REPO = "YuvalSuskin/serverless-starter-kit";
+const BEADS_CONFIG = ".beads/config.yaml";
+
+/** The `owner/name` a git or Dolt remote URL points at, lowercased; https, ssh and git+ forms alike. */
+function repoKey(url: string): string {
+  const [name = "", owner = ""] = url
+    .trim()
+    .split(/[/:]/)
+    .filter((part) => part !== "")
+    .toReversed();
+  return `${owner}/${name.endsWith(".git") ? name.slice(0, -4) : name}`.toLowerCase();
+}
 
 /** The settings file with the guarded hook made plain; the JSON text is edited, not re-serialised. */
 function unguardHook(text: string): string {
@@ -58,6 +79,8 @@ type ReplacementKind =
 export interface RenameReport {
   /** Tracked files whose content or path changed. */
   filesChanged: number;
+  /** The template's tracker remote, removed from `.beads/config.yaml`. */
+  trackerRemote: string | undefined;
   replacements: Record<ReplacementKind, number>;
   renamedPaths: { from: string; to: string }[];
   /** Third-party package names holding the placeholder, left as they are. */
@@ -98,6 +121,8 @@ const ALLOWLIST: readonly Allowed[] = [
 ];
 
 const HIT = /acme/i;
+/** What a renamed project must not name: the placeholder, or the template's repository. */
+const LEFT = new RegExp(`acme|${TEMPLATE_REPO.split("/")[1] ?? ""}`, "i");
 
 const SLUG = /^[a-z][a-z0-9-]{0,49}$/;
 // Letters and digits in any script, inner spaces, dots and hyphens: a name
@@ -130,7 +155,12 @@ function validate(name: ProjectName): void {
 }
 
 function git(root: string, args: string[]): string {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  return execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
 
 const nulList = (out: string) => out.split("\0").filter((entry) => entry !== "");
@@ -171,6 +201,26 @@ function preconditions(root: string): void {
       `the tree has uncommitted changes; commit or stash them first:\n${dirty}`,
     );
   }
+  const origin = templateOrigin(root);
+  if (origin !== undefined) {
+    throw new RenameRefused(
+      `origin is the template's repository (${origin}): a clone that keeps the template's history would share its tracker. Copy it as the README says (rm -rf .git && git init, then commit), or use GitHub's "Use this template"`,
+    );
+  }
+}
+
+/** The origin URL, when it is the template's repository or its tracker remote. */
+function templateOrigin(root: string): string | undefined {
+  let url: string;
+  try {
+    url = git(root, ["config", "--get", "remote.origin.url"]).trim();
+  } catch {
+    return undefined;
+  }
+  const config = path.join(root, BEADS_CONFIG);
+  const remote = existsSync(config) ? dropTrackerRemote(readFileSync(config, "utf8")).remote : "";
+  const template = [TEMPLATE_REPO, remote ?? ""].filter((u) => u !== "").map(repoKey);
+  return template.includes(repoKey(url)) ? url : undefined;
 }
 
 // --- What a placeholder becomes ----------------------------------------------
@@ -352,12 +402,31 @@ function hitsIn(file: string, text: string, thirdParty: string[]): Leftover[] {
   const { hide } = masker(thirdParty);
   return text
     .split("\n")
-    .flatMap((line, i) => (HIT.test(hide(line)) ? [{ file, line: i + 1, text: line.trim() }] : []));
+    .flatMap((line, i) =>
+      LEFT.test(hide(line)) ? [{ file, line: i + 1, text: line.trim() }] : [],
+    );
+}
+
+/** The tracker remote line left in `.beads/config.yaml`, whatever it names. */
+function remoteLeft(root: string): Leftover[] {
+  const config = path.join(root, BEADS_CONFIG);
+  if (!existsSync(config)) return [];
+  const text = readFileSync(config, "utf8");
+  const { line, remote } = dropTrackerRemote(text);
+  const lines = new Set(remoteLines(text));
+  if (remote !== undefined) lines.add(line);
+  const all = text.split("\n");
+  return [...lines]
+    .toSorted((a, b) => a - b)
+    .map((n) => ({ file: BEADS_CONFIG, line: n, text: all[n - 1]?.trim() ?? "" }));
 }
 
 function grepFiles(root: string): string[] {
+  const [, repoName = ""] = TEMPLATE_REPO.split("/");
   try {
-    return nulList(git(root, ["grep", "-z", "-I", "-l", "-i", PLACEHOLDER, "--", "."]));
+    return nulList(
+      git(root, ["grep", "-z", "-I", "-l", "-i", "-e", PLACEHOLDER, "-e", repoName, "--", "."]),
+    );
   } catch (error) {
     // git grep exits 1 when nothing matches.
     if ((error as { status?: number }).status === 1) return [];
@@ -366,16 +435,21 @@ function grepFiles(root: string): string[] {
 }
 
 /**
- * Lines of tracked text files that still hold the placeholder, outside the
- * allowlist and third-party names. `installed`: pnpm install has run, so the
- * lockfile must be clean too.
+ * Lines of tracked text files that still hold the placeholder or name the
+ * template's repository, outside the allowlist and third-party names, and a
+ * tracker remote left in `.beads/config.yaml`. `installed`: pnpm install has
+ * run, so the lockfile must be clean too.
  */
 export function leftovers(root: string, opts: { installed: boolean }): Leftover[] {
   const manifests = nulList(git(root, ["ls-files", "-z", "--", "package.json", "*/package.json"]));
   const thirdParty = thirdPartyNames(root, manifests);
-  return grepFiles(root)
+  const named = grepFiles(root)
     .filter((file) => !allowed(file, opts.installed))
     .flatMap((file) => hitsIn(file, readFileSync(path.join(root, file), "utf8"), thirdParty));
+  const remote = remoteLeft(root).filter(
+    (hit) => !named.some((n) => n.file === hit.file && n.line === hit.line),
+  );
+  return [...named, ...remote];
 }
 
 const isBinary = (bytes: Buffer) => bytes.subarray(0, 8000).includes(0);
@@ -398,6 +472,25 @@ interface Plan {
   changes: Change[];
   problems: Leftover[];
   thirdParty: string[];
+  trackerRemote: string | undefined;
+}
+
+/** The text a file starts from before the replacements: the hook unguarded, the tracker remote gone. */
+function prepare(file: string, text: string, found: Plan): string {
+  if (file === SETTINGS) return unguardHook(text);
+  if (file !== BEADS_CONFIG) return text;
+  const dropped = dropTrackerRemote(text);
+  found.trackerRemote = dropped.remote;
+  const lines = dropped.text.split("\n");
+  for (const n of remoteLines(dropped.text)) {
+    const left = lines[n - 1]?.trim() ?? "";
+    found.problems.push({
+      file,
+      line: n,
+      text: `a tracker remote the rename cannot remove (write it as sync:, then remote: on its own line): ${left}`,
+    });
+  }
+  return dropped.text;
 }
 
 /** One tracked file's new path and text, adding what would be left over to `found`. */
@@ -418,7 +511,7 @@ function planFile(
   // Every text file: the AppInitial letter can sit in one that names no placeholder.
   if (bytes !== undefined && !isBinary(bytes)) {
     const before = bytes.toString("utf8");
-    const source = file === SETTINGS ? unguardHook(before) : before;
+    const source = prepare(file, before, found);
     const after =
       file === ".beads/metadata.json"
         ? rewriteMetadata(source, ctx.forms, ctx.counts)
@@ -436,7 +529,7 @@ function plan(root: string, forms: Forms, counts: Counts): Plan {
     root,
     tracked.filter((file) => path.basename(file) === "package.json"),
   );
-  const found: Plan = { changes: [], problems: [], thirdParty };
+  const found: Plan = { changes: [], problems: [], thirdParty, trackerRemote: undefined };
   const ctx = { counts, forms, mask: masker(thirdParty), thirdParty };
   for (const file of tracked) planFile(root, file, ctx, found);
   return found;
@@ -447,12 +540,12 @@ export async function renameProject(root: string, name: ProjectName): Promise<Re
   validate(name);
   preconditions(root);
   const counts = emptyCounts();
-  const { changes, problems, thirdParty } = plan(root, formsOf(name), counts);
+  const { changes, problems, thirdParty, trackerRemote } = plan(root, formsOf(name), counts);
 
   if (problems.length > 0) {
     const list = problems.map((p) => `  ${p.file}:${String(p.line)}: ${p.text}`).join("\n");
     throw new RenameRefused(
-      `the placeholder would be left here, outside the allowlist in tools/bootstrap/src/rename.ts; nothing was changed:\n${list}`,
+      `the placeholder or the template's repository would be left here, outside the allowlist in tools/bootstrap/src/rename.ts; nothing was changed:\n${list}`,
     );
   }
 
@@ -474,5 +567,6 @@ export async function renameProject(root: string, name: ProjectName): Promise<Re
       .map(({ from, to }) => ({ from, to })),
     replacements: counts,
     thirdParty,
+    trackerRemote,
   };
 }

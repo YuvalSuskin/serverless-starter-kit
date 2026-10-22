@@ -24,6 +24,8 @@ scratch/
 .beads-credential-key
 # The passive JSONL export of the Dolt tracker (Dolt is the source of truth)
 .beads/issues.jsonl
+# What pnpm rename set aside before bd init (tools/bootstrap/src/finish.ts, tracker.ts).
+.beads/set-aside-*/
 .beads/proxieddb/
 *.gate.lock*
 

@@ -21,8 +21,9 @@ says so in its header) that a real first feature replaces. In a fresh copy,
 2. **Install.** `pnpm install` (Node 24 from `.nvmrc`, pnpm 10.34.5).
 3. **Name it, once.** `pnpm rename <slug> "<Display Name>"` rewrites the
    placeholder name in every tracked text file and path, runs `pnpm install`,
-   starts the issue tracker with the slug as its prefix and loads the seed
-   memories. If it stops partway it prints what is left as commands; run
+   starts a fresh issue tracker with the slug as its prefix (it removes the
+   template's tracker remote first, so nothing of the template's tracker
+   comes along) and loads the seed memories. If it stops partway it prints what is left as commands; run
    `pnpm rename --resume`.
 4. **Bootstrap it.** Open Claude Code in the folder and type `/bootstrap`. It
    runs seven steps, one question at a time, and resumes where it stopped

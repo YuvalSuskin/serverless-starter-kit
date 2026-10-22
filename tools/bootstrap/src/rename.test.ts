@@ -1,7 +1,7 @@
 // The rename, on fixture trees and on a `git archive HEAD` copy of this repo.
 // Every name here is the placeholder's: this file is on the rename's
 // allowlist, so it keeps meaning what it says after a project is renamed.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -48,6 +48,9 @@ const settings = (command: string) =>
 
 const BINARY = Buffer.from([0, 1, 2, ...Buffer.from("acme"), 0, 255]);
 
+/** The template's own tracker remote, as its published `.beads/config.yaml` names it. */
+const TEMPLATE_REMOTE = "git+https://github.com/YuvalSuskin/serverless-starter-kit.git";
+
 /** A small template: every kind of placeholder the real one holds, committed. */
 function fixture(): string {
   const root = tempDir();
@@ -88,7 +91,7 @@ function fixture(): string {
       "};",
       "",
     ].join("\n"),
-    ".beads/config.yaml": "# Issue prefix\nissue-prefix: acme\n",
+    ".beads/config.yaml": `# Issue prefix\nissue-prefix: acme\nexport:\n    auto: true\nsync:\n    remote: "${TEMPLATE_REMOTE}"\n`,
     ".beads/metadata.json": `{\n  "database": "dolt",\n  "dolt_database": "acme",\n  "project_id": "5f04d4d2-0000"\n}`,
     "infra/aws/github-deploy.yaml": [
       "  AppInitial:",
@@ -196,6 +199,40 @@ describe("renameProject refuses", () => {
     expect(read(root, "package.json")).toContain('"name": "demo"');
   });
 
+  it.each([
+    ["https", "https://github.com/YuvalSuskin/serverless-starter-kit.git"],
+    ["ssh, through a host alias", "github-work:YuvalSuskin/Serverless-Starter-Kit"],
+    ["the tracker remote's own", TEMPLATE_REMOTE],
+  ])("a clone whose origin is the template's repository (%s), in one line", async (_form, url) => {
+    const root = fixture();
+    git(root, "remote", "add", "origin", url);
+    const refusal = renameProject(root, { display: "Demo", slug: "demo" });
+    await expect(refusal).rejects.toThrow(RenameRefused);
+    await expect(refusal).rejects.toThrow(/^[^\n]*origin is the template's repository[^\n]*$/);
+    untouched(root);
+  });
+
+  it("a tracker remote it cannot remove (flow style), before changing a file", async () => {
+    const root = fixture();
+    write(root, { ".beads/config.yaml": 'issue-prefix: acme\nsync: { remote: "file:///tpl" }\n' });
+    git(root, "add", ".beads/config.yaml");
+    git(root, "commit", "-q", "-m", "config");
+    await expect(renameProject(root, { display: "Demo", slug: "demo" })).rejects.toThrow(
+      /\.beads\/config\.yaml:2: a tracker remote the rename cannot remove/,
+    );
+    untouched(root);
+  });
+
+  it("when the template's repository would be named outside the allowlist", async () => {
+    const root = fixture();
+    write(root, { "docs/links.md": "See github.com/YuvalSuskin/serverless-starter-kit.\n" });
+    commitAll(root);
+    await expect(renameProject(root, { display: "Demo", slug: "demo" })).rejects.toThrow(
+      /docs\/links\.md:1/,
+    );
+    untouched(root);
+  });
+
   it("when a placeholder would be left outside the allowlist, before changing a file", async () => {
     const root = fixture();
     write(root, { "src/glued.ts": 'export const odd = "acmeish";\n' });
@@ -239,7 +276,11 @@ describe("renameProject, to demo", () => {
     );
     expect(read(root, "packages/config/eslint.mjs")).toContain("plugins: { demo: { rules: {");
     expect(read(root, "packages/config/eslint.mjs")).toContain('"demo/zod-namespace-import"');
-    expect(read(root, ".beads/config.yaml")).toBe("# Issue prefix\nissue-prefix: demo\n");
+    // The template's tracker remote goes: bd init would adopt the template's issues.
+    expect(read(root, ".beads/config.yaml")).toBe(
+      "# Issue prefix\nissue-prefix: demo\nexport:\n    auto: true\n",
+    );
+    expect(report.trackerRemote).toBe(TEMPLATE_REMOTE);
     // bd init writes a fresh project_id: the template's tracker is not the project's.
     expect(JSON.parse(read(root, ".beads/metadata.json"))).toEqual({
       database: "dolt",
@@ -266,6 +307,29 @@ describe("renameProject, to demo", () => {
     expect(report.filesChanged).toBe(10);
   });
 
+  it.each([
+    [
+      "a flat sync.remote key",
+      "issue-prefix: acme\nsync.remote: 'file:///tpl' # the template's\n",
+      "issue-prefix: demo\n",
+    ],
+    [
+      "a sync block holding more than the remote, which stays",
+      "sync:\n  # where issues go\n  remote: file:///tpl\n  branch: main\nissue-prefix: acme\n",
+      "sync:\n  # where issues go\n  branch: main\nissue-prefix: demo\n",
+    ],
+    ["no remote at all", "issue-prefix: acme\nsync:\n  branch: main\n", undefined],
+  ])("drops the tracker remote from %s", async (_shape, config, after) => {
+    const root = fixture();
+    write(root, { ".beads/config.yaml": config });
+    git(root, "add", ".beads/config.yaml");
+    git(root, "commit", "-q", "-m", "config");
+    const report = await renameProject(root, { display: "Demo", slug: "demo" });
+    const expected = after ?? config.replace("acme", "demo");
+    expect(read(root, ".beads/config.yaml")).toBe(expected);
+    expect(report.trackerRemote).toBe(after === undefined ? undefined : "file:///tpl");
+  });
+
   it("leaves no placeholder outside the allowlist, and every package name valid", async () => {
     const root = fixture();
     await renameProject(root, { display: "Demo", slug: "demo" });
@@ -276,6 +340,65 @@ describe("renameProject, to demo", () => {
       );
     }
   });
+});
+
+describe("leftovers", () => {
+  it("names a tracker remote left in .beads/config.yaml, whatever its URL", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, {
+      ".beads/config.yaml": `${read(root, ".beads/config.yaml")}sync:\n    remote: "file:///elsewhere"\n`,
+    });
+    expect(leftovers(root, { installed: false })).toEqual([
+      {
+        file: ".beads/config.yaml",
+        line: 6,
+        text: 'remote: "file:///elsewhere"',
+      },
+    ]);
+  });
+
+  it.each([
+    ["flow style", 'sync: { remote: "file:///elsewhere" }'],
+    ["CRLF line ends", 'sync:\r\n    remote: "file:///elsewhere"\r'],
+  ])("names a tracker remote the parser cannot read (%s)", async (_shape, lines) => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, { ".beads/config.yaml": `${read(root, ".beads/config.yaml")}${lines}\n` });
+    expect(leftovers(root, { installed: false }).map((hit) => hit.file)).toContain(
+      ".beads/config.yaml",
+    );
+  });
+
+  it("names no line that only mentions a remote (another key, or a value)", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    const extra = 'git-remote: x\ndescription: "has remote: in it"\nbackup:\n    git-remote: y\n';
+    write(root, { ".beads/config.yaml": `${read(root, ".beads/config.yaml")}${extra}` });
+    expect(leftovers(root, { installed: false })).toEqual([]);
+  });
+
+  it("names the template's repository in a tracked file", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, { "docs/links.md": "Forked from Serverless-Starter-Kit.\n" });
+    git(root, "add", "docs/links.md");
+    expect(leftovers(root, { installed: false })).toEqual([
+      { file: "docs/links.md", line: 1, text: "Forked from Serverless-Starter-Kit." },
+    ]);
+  });
+});
+
+// The README's route: a copy with no git remote at all.
+it("says nothing on stderr about a missing origin", () => {
+  const root = fixture();
+  const script = `const { renameProject } = await import(${JSON.stringify(path.join(import.meta.dirname, "rename.ts"))});
+await renameProject(${JSON.stringify(root)}, { display: "Demo", slug: "demo" });`;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    encoding: "utf8",
+  });
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe("");
 });
 
 describe("renameProject, to a one-letter slug", () => {
@@ -312,43 +435,71 @@ describe("renameProject, to a hyphenated slug", () => {
 });
 
 // The real template, as a new project gets it. A renamed project has no
-// marker, so there the test has nothing to rename and skips.
+// marker: there the same copy must refuse a second rename, and nothing skips.
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))(
-  "renameProject on this repo's HEAD",
-  () => {
-    it("leaves no placeholder outside the allowlist, and every package name valid", async () => {
-      const copy = tempDir();
-      const tar = path.join(copy, ".head.tar");
-      git(repoRoot, "archive", "--format=tar", "-o", tar, "HEAD");
-      execFileSync("tar", ["-xf", tar, "-C", copy]);
-      rmSync(tar);
-      initRepo(copy);
-      commitAll(copy);
+const isTemplate = existsSync(path.join(repoRoot, MARKER));
 
-      const report = await renameProject(copy, { display: "Demo", slug: "demo" });
+/** A committed `git archive HEAD` copy of this repo. */
+function headCopy(): string {
+  const copy = tempDir();
+  const tar = path.join(copy, ".head.tar");
+  git(repoRoot, "archive", "--format=tar", "-o", tar, "HEAD");
+  execFileSync("tar", ["-xf", tar, "-C", copy]);
+  rmSync(tar);
+  initRepo(copy);
+  commitAll(copy);
+  return copy;
+}
 
-      expect(report.filesChanged).toBeGreaterThan(100);
-      expect(read(copy, ".claude/settings.json")).toContain(JSON.stringify(PRIME));
-      expect(read(copy, ".claude/settings.json")).not.toContain("test -e");
-      // The template ships the bootstrap's state, every step pending; the rename keeps it.
-      expect(JSON.parse(read(copy, ".bootstrap/state.json"))).toEqual({ steps: {} });
-      expect(git(copy, "ls-files", ".bootstrap/state.json").trim()).toBe(".bootstrap/state.json");
-      expect(leftovers(copy, { installed: false })).toEqual([]);
-      const manifests = git(copy, "ls-files", "package.json", "*/package.json").trim().split("\n");
-      expect(manifests.length).toBeGreaterThan(5);
-      for (const file of manifests) {
-        const { name } = JSON.parse(read(copy, file)) as { name?: unknown };
-        expect(validNpmName(name), `${file}: ${String(name)}`).toBe(true);
-        expect(String(name)).toMatch(/^(@demo\/[a-z-]+|demo)$/);
-      }
-    });
-  },
-);
+const ESCAPED_MARKER = MARKER.replaceAll(".", "\\.");
+const MARKER_MISSING = new RegExp(`${ESCAPED_MARKER} is missing`);
+
+/** The template: its HEAD, renamed in a copy, is clean. */
+async function checkTemplateHead(): Promise<void> {
+  const copy = headCopy();
+  const report = await renameProject(copy, { display: "Demo", slug: "demo" });
+
+  expect(report.filesChanged).toBeGreaterThan(100);
+  expect(read(copy, ".claude/settings.json")).toContain(JSON.stringify(PRIME));
+  expect(read(copy, ".claude/settings.json")).not.toContain("test -e");
+  // The template ships the bootstrap's state, every step pending; the rename keeps it.
+  expect(JSON.parse(read(copy, ".bootstrap/state.json"))).toEqual({ steps: {} });
+  expect(git(copy, "ls-files", ".bootstrap/state.json").trim()).toBe(".bootstrap/state.json");
+  expect(leftovers(copy, { installed: false })).toEqual([]);
+  const manifests = git(copy, "ls-files", "package.json", "*/package.json").trim().split("\n");
+  expect(manifests.length).toBeGreaterThan(5);
+  for (const file of manifests) {
+    const { name } = JSON.parse(read(copy, file)) as { name?: unknown };
+    expect(validNpmName(name), `${file}: ${String(name)}`).toBe(true);
+    expect(String(name)).toMatch(/^(@demo\/[a-z-]+|demo)$/);
+  }
+}
+
+/**
+ * A named project: a second rename is refused, changing nothing. The marker
+ * check comes before any write, so this runs on the project itself (in
+ * check:full's renamed copy the rename is not committed yet, so HEAD is
+ * still the template's).
+ */
+async function checkSecondRenameRefused(): Promise<void> {
+  const before = git(repoRoot, "status", "--porcelain");
+  await expect(renameProject(repoRoot, { display: "Shop", slug: "shop" })).rejects.toThrow(
+    MARKER_MISSING,
+  );
+  expect(git(repoRoot, "status", "--porcelain")).toBe(before);
+}
+
+// One test for both modes: nothing here skips, in the template or in a project.
+describe("renameProject on this repo", () => {
+  it("renames the template's HEAD clean; a named project refuses a second rename, changing nothing", async () => {
+    expect.hasAssertions();
+    await (isTemplate ? checkTemplateHead() : checkSecondRenameRefused());
+  });
+});
 
 // Claude Code's SessionStart hook, run as Claude Code runs it: by a shell, in
 // the project, with CLAUDE_PROJECT_DIR set. A stand-in bd records each call.
-describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))("the SessionStart hook", () => {
+describe("the SessionStart hook", () => {
   const hookCommand = () => {
     const parsed = JSON.parse(read(repoRoot, ".claude/settings.json")) as {
       hooks: { SessionStart: { hooks: { command: string }[] }[] };
@@ -370,8 +521,8 @@ describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))("the SessionStart hook
     return existsSync(log) ? read(bin, "calls").trim().split("\n") : [];
   };
 
-  it("is the guarded bd prime in the template", () => {
-    expect(hookCommand()).toEqual([PRIME_GUARDED]);
+  it("is the guarded bd prime in the template, and plain bd prime once renamed", () => {
+    expect(hookCommand()).toEqual([isTemplate ? PRIME_GUARDED : PRIME]);
   });
 
   const PRIMED = [`bd ${PRIME.slice(3)}`];

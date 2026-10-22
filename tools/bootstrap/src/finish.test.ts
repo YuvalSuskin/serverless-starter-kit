@@ -1,6 +1,14 @@
 // The steps after the rename, with a scripted runner: what they run, and what
 // a failure tells the owner.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, onTestFinished } from "vitest";
@@ -9,6 +17,13 @@ import { finishSteps, renamedSlug, type RunResult, runSteps } from "./finish.ts"
 
 const SWEEP = "docs/superpowers/specs/2026-09-30-sweep-design.md";
 const RESEARCH = "docs/research/2026-09-25-harness-engineering.md";
+
+function write(root: string, files: Record<string, string>): void {
+  for (const [file, text] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), text);
+  }
+}
 
 function renamedRepo(): string {
   const root = mkdtempSync(path.join(tmpdir(), "finish-test-"));
@@ -35,6 +50,14 @@ function renamedRepo(): string {
 function scripted(opts: {
   fail?: string;
   listed?: { id: string; status: string; title: string }[];
+  /** The tracker's prefix after bd init (an adopted tracker keeps its own). */
+  prefix?: string;
+  /** The repo bd init writes into `.beads/config.yaml` as sync.remote (git's origin). */
+  wires?: { root: string; url: string };
+  /** bd init imports `.beads/issues.jsonl` into this repo, leaving its record of the import. */
+  imports?: string;
+  /** What `bd memories --json` answers. */
+  memories?: Record<string, string>;
 }) {
   const calls: string[] = [];
   let next = 0;
@@ -46,9 +69,25 @@ function scripted(opts: {
       return { status: 1, stderr: "something broke\n", stdout: "" };
     }
     if (cmd === "git") return ok("c0ffee\n");
+    if (args[0] === "init" && opts.wires !== undefined) {
+      const config = path.join(opts.wires.root, ".beads/config.yaml");
+      writeFileSync(
+        config,
+        `${readFileSync(config, "utf8")}sync:\n    remote: ${opts.wires.url}\n`,
+      );
+    }
+    if (args[0] === "init" && opts.imports !== undefined) {
+      writeFileSync(path.join(opts.imports, ".beads/.auto-import-issues.jsonl"), "{}\n");
+    }
+    if (args[0] === "memories") return ok(JSON.stringify({ schema_version: 1, ...opts.memories }));
+    if (args[0] === "config") {
+      return ok(JSON.stringify({ key: "issue_prefix", value: opts.prefix ?? "demo" }));
+    }
     if (args[0] === "list") {
+      const listed = opts.listed ?? [];
+      if (!args.includes("--title")) return ok(JSON.stringify(listed));
       const title = args[args.indexOf("--title") + 1];
-      return ok(JSON.stringify((opts.listed ?? []).filter((b) => b.title === title)));
+      return ok(JSON.stringify(listed.filter((b) => b.title === title)));
     }
     if (args[0] === "create") return ok(JSON.stringify({ id: `demo-n${String(++next)}` }));
     return ok();
@@ -95,6 +134,131 @@ describe("finishSteps", () => {
     ]);
     expect(calls).not.toContain("bd close demo-old --reason Inherited document; nothing to do");
     expect(readFileSync(path.join(root, SWEEP), "utf8")).toContain("**Beads:** `demo-old`");
+  });
+});
+
+describe("the tracker bd init made", () => {
+  // bd init clones a tracker it finds: sync.remote, or refs/dolt/data on git's
+  // origin (a mirror or a renamed fork of the template). Whatever the URL, a
+  // tracker with another prefix or with issues of its own stops the rename
+  // before an anchor is filed.
+  it.each([
+    ["another prefix", { prefix: "tpl" }, /prefix "tpl"/],
+    [
+      "issues of its own",
+      { listed: [{ id: "demo-zz1", status: "open", title: "Someone else's work" }] },
+      /1 issue/,
+    ],
+  ])("stops, in one line, when it holds %s", (_what, opts, why) => {
+    const root = renamedRepo();
+    write(root, { ".beads/config.yaml": "issue-prefix: demo\n" });
+    const { calls, run } = scripted({
+      ...opts,
+      wires: { root, url: "/srv/mirror.git" },
+    });
+    const { ok, report } = runSteps(finishSteps(root, "demo", run), () => undefined);
+    expect(ok).toBe(false);
+    const [first = ""] = report.split("\n");
+    expect(first).toMatch(/^pnpm rename: bd init failed: bd init adopted another tracker/);
+    expect(first).toMatch(why);
+    expect(first).toContain("/srv/mirror.git");
+    expect(calls.some((c) => c.startsWith("bd create"))).toBe(false);
+    expect(calls.some((c) => c.startsWith("bd remember"))).toBe(false);
+  });
+
+  it("stops when it holds memories this rename did not import", () => {
+    const root = renamedRepo();
+    const { run } = scripted({ memories: { "owner-inbox": "x", "template-only": "y" } });
+    const { ok, report } = runSteps(finishSteps(root, "demo", run), () => undefined);
+    expect(ok).toBe(false);
+    expect(report.split("\n")[0]).toMatch(/1 memory/);
+  });
+
+  it("names the issues file bd imported, when no remote is set", () => {
+    const root = renamedRepo();
+    const { run } = scripted({ imports: root, prefix: "tpl" });
+    const { report } = runSteps(finishSteps(root, "demo", run), () => undefined);
+    const [first = ""] = report.split("\n");
+    expect(first).toContain("from .beads/issues.jsonl (bd init imported it)");
+    expect(first).not.toContain("a remote");
+    expect(first).toContain(".beads/.auto-import-issues.jsonl");
+  });
+
+  it("sets aside the issues bd exported, before bd init, when no database exists yet", () => {
+    const root = renamedRepo();
+    write(root, {
+      ".beads/issues.jsonl": '{"id":"tpl-1"}\n',
+      ".beads/.auto-import-issues.jsonl": '{"id":"tpl-1"}\n',
+    });
+    const logs: string[] = [];
+    runSteps(finishSteps(root, "demo", scripted({}).run), (l) => logs.push(l));
+    expect(existsSync(path.join(root, ".beads/issues.jsonl"))).toBe(false);
+    expect(existsSync(path.join(root, ".beads/.auto-import-issues.jsonl"))).toBe(false);
+    const [aside = ""] = readdirSync(path.join(root, ".beads")).filter((d) =>
+      d.startsWith("set-aside-"),
+    );
+    expect(
+      readdirSync(path.join(root, ".beads", aside)).toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual([".auto-import-issues.jsonl", "issues.jsonl"]);
+    expect(logs[1]).toContain(
+      `It set aside .beads/issues.jsonl and .beads/.auto-import-issues.jsonl (to .beads/${aside}) first.`,
+    );
+  });
+
+  it("leaves the issues file alone once a database exists", () => {
+    const root = renamedRepo();
+    write(root, { ".beads/issues.jsonl": '{"id":"demo-1"}\n' });
+    mkdirSync(path.join(root, ".beads/embeddeddolt"));
+    runSteps(finishSteps(root, "demo", scripted({}).run), () => undefined);
+    expect(existsSync(path.join(root, ".beads/issues.jsonl"))).toBe(true);
+  });
+
+  it("on a resume, accepts the anchors it filed itself", () => {
+    const root = renamedRepo();
+    const listed = [
+      { id: "demo-a1", status: "closed", title: "Consistency sweep (inherited design)" },
+      { id: "demo-a2", status: "closed", title: "Harness engineering research (inherited)" },
+    ];
+    const { ok } = runSteps(finishSteps(root, "demo", scripted({ listed }).run), () => undefined);
+    expect(ok).toBe(true);
+  });
+
+  it("names the remote bd wired from git's origin, which nothing pushed to", () => {
+    const root = renamedRepo();
+    const { run } = scripted({ wires: { root, url: "https://github.com/me/shop.git" } });
+    const logs: string[] = [];
+    expect(runSteps(finishSteps(root, "demo", run), (l) => logs.push(l)).ok).toBe(true);
+    expect(logs[1]).toBe(
+      "bd init: a fresh tracker, prefix demo. bd set git's origin as its remote (https://github.com/me/shop.git) and pushed nothing to it; until it holds the tracker, git push stops at the pre-push hook's bd sync. Before the first git push, keep it (bd dolt push, once) or remove it (pnpm tracker:drop-remote): bootstrap step 1 asks the owner.",
+    );
+  });
+
+  it("drops a tracker remote from the config before bd init, when no database exists yet (a resume)", () => {
+    const root = renamedRepo();
+    write(root, {
+      ".beads/config.yaml": 'issue-prefix: demo\nsync:\n    remote: "file:///tpl"\n',
+    });
+    const { calls, run } = scripted({});
+    const logs: string[] = [];
+    runSteps(finishSteps(root, "demo", run), (l) => logs.push(l));
+    expect(readFileSync(path.join(root, ".beads/config.yaml"), "utf8")).toBe(
+      "issue-prefix: demo\n",
+    );
+    expect(logs[1]).toContain(
+      "removed the tracker remote file:///tpl from .beads/config.yaml first",
+    );
+    expect(calls).toContain(
+      "bd init --prefix demo --non-interactive --skip-hooks --skip-agents --init-if-missing --quiet",
+    );
+  });
+
+  it("leaves the config's remote alone once a database exists (bd init skips)", () => {
+    const root = renamedRepo();
+    const config = 'issue-prefix: demo\nsync:\n    remote: "https://github.com/me/shop.git"\n';
+    write(root, { ".beads/config.yaml": config });
+    mkdirSync(path.join(root, ".beads/embeddeddolt"));
+    runSteps(finishSteps(root, "demo", scripted({}).run), () => undefined);
+    expect(readFileSync(path.join(root, ".beads/config.yaml"), "utf8")).toBe(config);
   });
 });
 
