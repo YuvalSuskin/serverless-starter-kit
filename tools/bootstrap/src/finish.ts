@@ -2,8 +2,10 @@
 // tracker steps. Each step is safe to run again, so `pnpm rename --resume`
 // runs them all after a failure; the failure itself prints every step left,
 // as commands the owner could run by hand (TB100).
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+
+import { dropTrackerRemote } from "./rename.ts";
 
 export interface RunResult {
   error?: Error;
@@ -93,6 +95,53 @@ function bdInit(run: Runner, slug: string): void {
   }
 }
 
+const CONFIG = ".beads/config.yaml";
+/** bd's database folders under `.beads/`: embedded, and server mode. */
+const DATABASES = ["embeddeddolt", "dolt"];
+
+const configRemote = (root: string) =>
+  dropTrackerRemote(readFileSync(path.join(root, CONFIG), "utf8")).remote;
+
+/**
+ * With no database yet, bd init would clone a tracker remote the config names
+ * (a `--resume` after an older rename, or an edit): it goes first. Returns it.
+ * Once a database exists, bd init skips, and the config is left alone.
+ */
+function dropRemoteBeforeInit(root: string): string | undefined {
+  if (DATABASES.some((dir) => existsSync(path.join(root, ".beads", dir)))) return undefined;
+  const file = path.join(root, CONFIG);
+  const { remote, text } = dropTrackerRemote(readFileSync(file, "utf8"));
+  if (remote !== undefined) writeFileSync(file, text);
+  return remote;
+}
+
+const plural = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+
+/**
+ * The tracker bd init left must be this project's own: the slug's prefix, and
+ * no issue but the anchors this rename files. bd init clones whatever tracker
+ * it finds (a sync.remote, or refs/dolt/data on git's origin, whatever its
+ * URL), so this is checked by what the tracker holds, not by a name.
+ */
+function checkOwnTracker(root: string, slug: string, run: Runner): void {
+  const prefix = (
+    JSON.parse(call(run, "bd", ["config", "get", "issue_prefix", "--json"])) as { value?: unknown }
+  ).value;
+  const issues = JSON.parse(call(run, "bd", ["list", "--all", "--limit", "0", "--json"])) as {
+    id: string;
+    title: string;
+  }[];
+  const anchors = new Set(ANCHORS.map((anchor) => anchor.title));
+  const foreign = issues.filter(
+    (bead) => !(bead.id.startsWith(`${slug}-`) && anchors.has(bead.title)),
+  );
+  if (prefix === slug && foreign.length === 0) return;
+  const from = configRemote(root) ?? "a remote bd found";
+  throw new StepFailed(
+    `bd init adopted another tracker (prefix "${String(prefix)}", ${plural(foreign.length, "issue")} not this rename's) from ${from}, which holds one in refs/dolt/data. Recover: rm -rf .beads/embeddeddolt .beads/dolt; point git's origin at the project's own repository (git remote set-url origin <url>) or remove it (git remote remove origin); remove sync.remote from .beads/config.yaml; then pnpm rename --resume`,
+  );
+}
+
 /** The anchor bead of this title: the one already filed (on a resume), else a new one, closed. */
 function anchorBead(run: Runner, anchor: (typeof ANCHORS)[number]): string {
   const found = JSON.parse(
@@ -141,13 +190,26 @@ export function finishSteps(root: string, slug: string, run: Runner): Step[] {
     {
       bd: true,
       byHand: [
+        "# first, with no .beads/embeddeddolt yet: remove any sync.remote from .beads/config.yaml (bd init would clone it)",
         line("bd", initArgs(slug)),
         "# if it made a commit 'bd init: ...': git reset --mixed HEAD~1 (the rename stays one change)",
+        `# then check it is a fresh tracker: bd config get issue_prefix says ${slug}, and bd list --all lists nothing`,
       ],
       name: "bd init",
       run: () => {
+        const dropped = dropRemoteBeforeInit(root);
         bdInit(run, slug);
-        return `bd init: a fresh tracker, prefix ${slug}.`;
+        checkOwnTracker(root, slug, run);
+        const wired = configRemote(root);
+        return [
+          `bd init: a fresh tracker, prefix ${slug}.`,
+          dropped === undefined
+            ? ""
+            : ` It removed the tracker remote ${dropped} from .beads/config.yaml first.`,
+          wired === undefined
+            ? ""
+            : ` bd set git's origin as its remote (${wired}); nothing was pushed. Bootstrap step 3 asks the owner to keep it or remove it.`,
+        ].join("");
       },
     },
     {

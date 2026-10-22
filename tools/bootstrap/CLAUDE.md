@@ -57,8 +57,16 @@ TB93 on).
   the template. The rename also refuses a clone whose `origin` is the
   template's repository (one that kept the template's history). The leftover
   check names any tracker remote still in the config, and any mention of
-  the template's repository (`TEMPLATE_REPO`) outside the allowlist.
-  Bootstrap step 3 sets the project's own remote, after the owner's yes.
+  the template's repository (`TEMPLATE_REPO`) outside the allowlist, or a
+  line that looks like a remote (`remote:`) the parser could not read.
+  Names are not enough: `bd init` also adopts `refs/dolt/data` from any git
+  `origin` (a mirror, a renamed fork), so after it the bd init step checks
+  the tracker is the project's own (the slug's prefix, no issue but the
+  anchors) and stops before filing an anchor otherwise. On a resume with no
+  database yet, it removes a remote left in the config before `bd init`.
+  With a git `origin` (GitHub's "Use this template"), `bd init` sets it as the
+  tracker's remote without pushing; the step says so, and bootstrap step 3
+  keeps or removes it with the owner.
 - **The tracker steps never push.** `bd init` commits the beads files; the
   CLI undoes that commit (keeping the changes) so the owner commits the
   rename as one change.

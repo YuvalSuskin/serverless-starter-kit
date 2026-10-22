@@ -1,7 +1,7 @@
 // The rename, on fixture trees and on a `git archive HEAD` copy of this repo.
 // Every name here is the placeholder's: this file is on the rename's
 // allowlist, so it keeps meaning what it says after a project is renamed.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -212,6 +212,17 @@ describe("renameProject refuses", () => {
     untouched(root);
   });
 
+  it("a tracker remote it cannot remove (flow style), before changing a file", async () => {
+    const root = fixture();
+    write(root, { ".beads/config.yaml": 'issue-prefix: acme\nsync: { remote: "file:///tpl" }\n' });
+    git(root, "add", ".beads/config.yaml");
+    git(root, "commit", "-q", "-m", "config");
+    await expect(renameProject(root, { display: "Demo", slug: "demo" })).rejects.toThrow(
+      /\.beads\/config\.yaml:2: a tracker remote the rename cannot remove/,
+    );
+    untouched(root);
+  });
+
   it("when the template's repository would be named outside the allowlist", async () => {
     const root = fixture();
     write(root, { "docs/links.md": "See github.com/YuvalSuskin/serverless-starter-kit.\n" });
@@ -347,6 +358,18 @@ describe("leftovers", () => {
     ]);
   });
 
+  it.each([
+    ["flow style", 'sync: { remote: "file:///elsewhere" }'],
+    ["CRLF line ends", 'sync:\r\n    remote: "file:///elsewhere"\r'],
+  ])("names a tracker remote the parser cannot read (%s)", async (_shape, lines) => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    write(root, { ".beads/config.yaml": `${read(root, ".beads/config.yaml")}${lines}\n` });
+    expect(leftovers(root, { installed: false }).map((hit) => hit.file)).toContain(
+      ".beads/config.yaml",
+    );
+  });
+
   it("names the template's repository in a tracked file", async () => {
     const root = fixture();
     await renameProject(root, { display: "Demo", slug: "demo" });
@@ -356,6 +379,18 @@ describe("leftovers", () => {
       { file: "docs/links.md", line: 1, text: "Forked from Serverless-Starter-Kit." },
     ]);
   });
+});
+
+// The README's route: a copy with no git remote at all.
+it("says nothing on stderr about a missing origin", () => {
+  const root = fixture();
+  const script = `const { renameProject } = await import(${JSON.stringify(path.join(import.meta.dirname, "rename.ts"))});
+await renameProject(${JSON.stringify(root)}, { display: "Demo", slug: "demo" });`;
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    encoding: "utf8",
+  });
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe("");
 });
 
 describe("renameProject, to a one-letter slug", () => {

@@ -55,12 +55,24 @@ const TOP_LEVEL = /^[^\s#]/;
 const INDENTED = /^[ \t]+[^\s#]/;
 
 /**
+ * Lines (1-based) of a config that look like a remote, read without parsing
+ * the YAML: a second net for what `dropTrackerRemote` cannot read (flow
+ * style, CRLF line ends).
+ */
+function remoteLines(text: string): number[] {
+  return text.split("\n").flatMap((line, i) => {
+    const code = line.trimStart();
+    return !code.startsWith("#") && /remote\s*:/.test(code) ? [i + 1] : [];
+  });
+}
+
+/**
  * `.beads/config.yaml` without its tracker remote: `remote:` under a
  * top-level `sync:` (dropped with it when nothing else is under it), or a flat
  * `sync.remote:` key. Returns the remote it removed and its line (1-based), if
  * any. The text is edited line by line, not re-serialised, so its comments stay.
  */
-function dropTrackerRemote(text: string): {
+export function dropTrackerRemote(text: string): {
   line: number;
   remote: string | undefined;
   text: string;
@@ -192,7 +204,12 @@ function validate(name: ProjectName): void {
 }
 
 function git(root: string, args: string[]): string {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  return execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
 
 const nulList = (out: string) => out.split("\0").filter((entry) => entry !== "");
@@ -245,7 +262,7 @@ function preconditions(root: string): void {
 function templateOrigin(root: string): string | undefined {
   let url: string;
   try {
-    url = git(root, ["remote", "get-url", "origin"]).trim();
+    url = git(root, ["config", "--get", "remote.origin.url"]).trim();
   } catch {
     return undefined;
   }
@@ -445,8 +462,12 @@ function remoteLeft(root: string): Leftover[] {
   if (!existsSync(config)) return [];
   const text = readFileSync(config, "utf8");
   const { line, remote } = dropTrackerRemote(text);
-  if (remote === undefined) return [];
-  return [{ file: BEADS_CONFIG, line, text: text.split("\n")[line - 1]?.trim() ?? "" }];
+  const lines = new Set(remoteLines(text));
+  if (remote !== undefined) lines.add(line);
+  const all = text.split("\n");
+  return [...lines]
+    .toSorted((a, b) => a - b)
+    .map((n) => ({ file: BEADS_CONFIG, line: n, text: all[n - 1]?.trim() ?? "" }));
 }
 
 function grepFiles(root: string): string[] {
@@ -509,6 +530,15 @@ function prepare(file: string, text: string, found: Plan): string {
   if (file !== BEADS_CONFIG) return text;
   const dropped = dropTrackerRemote(text);
   found.trackerRemote = dropped.remote;
+  const lines = dropped.text.split("\n");
+  for (const n of remoteLines(dropped.text)) {
+    const left = lines[n - 1]?.trim() ?? "";
+    found.problems.push({
+      file,
+      line: n,
+      text: `a tracker remote the rename cannot remove (write it as sync:, then remote: on its own line): ${left}`,
+    });
+  }
   return dropped.text;
 }
 
