@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`composes every route, with its name, method and path, as the one table did 1`] = `
+[
+  "public.health GET /api/health public",
+  "public.listMessages GET /api/public/messages public",
+  "public.sendMessage POST /api/public/messages public",
+]
+`;

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/entries/lambda/api.ts", "tests/bundle/*.entry.ts"],
+  "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/*.ts"],
+  "ignoreBinaries": ["prettier", "turbo"]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "acme",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:contract": "turbo run test:contract",
+    "test:bundle": "turbo run test:bundle",
+    "format": "prettier --check --no-error-on-unmatched-pattern package.json pnpm-workspace.yaml turbo.json .prettierrc.json .github",
+    "fix": "prettier --write --no-error-on-unmatched-pattern package.json pnpm-workspace.yaml turbo.json .prettierrc.json .github && turbo run fix --continue",
+    "check": "turbo run format lint typecheck knip test test:contract test:bundle",
+    "check:push": "node tools/local-check/src/cli.ts push",
+    "check:full": "node tools/local-check/src/cli.ts full",
+    "offline": "node tools/local-check/src/cli.ts offline",
+    "merge-gate": "node tools/local-check/src/cli.ts merge-gate",
+    "prepare": "[ -n \"$CI\" ] || [ ! -d .beads/hooks ] || git config core.hooksPath >/dev/null || git config core.hooksPath .beads/hooks || true",
+    "e2e": "turbo run e2e",
+    "preview": "node tools/preview/src/cli.ts",
+    "rename": "node tools/bootstrap/src/cli.ts",
+    "bootstrap:state": "node tools/bootstrap/src/state-cli.ts",
+    "competitors": "node tools/competitors/src/cli.ts",
+    "review-batch": "node tools/review-batch/src/cli.ts",
+    "sweep": "node tools/sweep/src/cli.ts",
+    "storybook": "turbo run storybook"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "turbo": "2.11.3"
+  }
+}

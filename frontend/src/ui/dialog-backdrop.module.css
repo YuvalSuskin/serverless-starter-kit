@@ -1,0 +1,14 @@
+/* The native <dialog> element has no visual footprint of its own: Part
+   2.1's motion must never cost input, so dialog.tsx and
+   confirm-dialog.tsx call close() the instant closing starts, releasing
+   the rest of the page's inertness at once rather than waiting for the
+   exit animation to finish. `display: contents` means that closing (and
+   the UA stylesheet's `dialog:not([open]) { display: none }` it would
+   otherwise trigger) never affects whether this element's children keep
+   rendering: the backdrop and card are real Motion-animated elements with
+   their own fixed positioning, kept alive by AnimatePresence for exactly
+   as long as their own exit transition takes, entirely independent of
+   the dialog's already-closed, already-non-modal state. */
+.dialog {
+  display: contents;
+}

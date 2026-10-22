@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/lib/data/types.ts", "src/lib/image-loader.ts", "open-next.config.ts"],
+  "project": [
+    "src/**/*.{ts,tsx,css}",
+    "tests/**/*.{ts,tsx}",
+    "e2e/**/*.ts",
+    ".storybook/*.{ts,tsx}"
+  ],
+  "ignoreBinaries": ["prettier", "turbo"]
+}

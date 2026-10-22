@@ -1,0 +1,713 @@
+<title>Owner Inbox</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --panel: #ffffff;
+    --text: #1f2328;
+    --muted: #5f6670;
+    --accent: #5b6ee1;
+    --accent-soft: #e7eafb;
+    --accent-strong: #3f51c4;
+    --line: #e1e3e7;
+    --code-bg: #f0f1f3;
+    --ok-fg: #1e6b47;
+    --ok-bg: #dcf0e4;
+    --warn-fg: #7a4d00;
+    --warn-bg: #ffefc7;
+    --info-fg: #2a5599;
+    --info-bg: #e2ebf9;
+    --btn: #1f2328;
+    --btn-text: #f7f7f8;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121316;
+      --panel: #1c1e22;
+      --text: #f2f3f5;
+      --muted: #a9afb8;
+      --accent: #8c9bf2;
+      --accent-soft: #2a2e49;
+      --accent-strong: #aeb9f7;
+      --line: #2e3138;
+      --code-bg: #17181c;
+      --ok-fg: #9fddb7;
+      --ok-bg: #173826;
+      --warn-fg: #f4cf7f;
+      --warn-bg: #3b2c0c;
+      --info-fg: #a9c3f2;
+      --info-bg: #1a2742;
+      --btn: #8c9bf2;
+      --btn-text: #121316;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316;
+    --panel: #1c1e22;
+    --text: #f2f3f5;
+    --muted: #a9afb8;
+    --accent: #8c9bf2;
+    --accent-soft: #2a2e49;
+    --accent-strong: #aeb9f7;
+    --line: #2e3138;
+    --code-bg: #17181c;
+    --ok-fg: #9fddb7;
+    --ok-bg: #173826;
+    --warn-fg: #f4cf7f;
+    --warn-bg: #3b2c0c;
+    --info-fg: #a9c3f2;
+    --info-bg: #1a2742;
+    --btn: #8c9bf2;
+    --btn-text: #121316;
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font:
+      15px/1.55 system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif;
+    padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+    padding-block: 28px 64px;
+    overflow-x: hidden;
+  }
+  /* Grid and flex children default to min-width:auto, so one long command or id
+   would widen the whole page past a phone's screen: every container may shrink. */
+  .wrap {
+    max-width: 860px;
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  header,
+  section,
+  .list,
+  .card,
+  .body,
+  .answer,
+  .top,
+  .meter {
+    min-width: 0;
+  }
+  header {
+    display: grid;
+    gap: 10px;
+  }
+  h1 {
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  h1 span {
+    color: var(--accent-strong);
+  }
+  .lede {
+    color: var(--muted);
+    margin: 0;
+    max-width: 62ch;
+  }
+  .meter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip {
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+  .chip.ok {
+    background: var(--ok-bg);
+    color: var(--ok-fg);
+  }
+  .chip.warn {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+  }
+  .chip.info {
+    background: var(--info-bg);
+    color: var(--info-fg);
+  }
+  .bar {
+    flex: 1 1 200px;
+    height: 8px;
+    background: var(--accent-soft);
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 120px;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    width: 0;
+    transition: width 0.4s;
+  }
+  section {
+    display: grid;
+    gap: 14px;
+  }
+  .list {
+    display: grid;
+    gap: 12px;
+  }
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: baseline;
+  }
+  h2 small {
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 400;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 12px;
+  }
+  .card.answered {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+  }
+  .card.answered .body {
+    display: none;
+  }
+  .card.answered.open .body {
+    display: grid;
+  }
+  .top {
+    display: flex;
+    gap: 6px 10px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .title {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    flex: 1 1 240px;
+    min-width: 0;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+  .bead {
+    font:
+      12px/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    color: var(--muted);
+    white-space: nowrap;
+    padding-top: 5px;
+  }
+  .body {
+    display: grid;
+    gap: 10px;
+  }
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 2px;
+  }
+  .q {
+    font-size: 15.5px;
+    margin: 0;
+  }
+  .q,
+  .rec p,
+  .why,
+  .outcome,
+  .steps li,
+  .empty,
+  .notice {
+    overflow-wrap: anywhere;
+  }
+  .rec {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+  .rec p {
+    margin: 0;
+  }
+  .why {
+    color: var(--muted);
+    margin: 0;
+    font-size: 14px;
+  }
+  .steps {
+    margin: 0;
+    padding-inline-start: 20px;
+    display: grid;
+    gap: 6px;
+  }
+  .cmd {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 0;
+  }
+  .cmd code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: pre;
+    background: var(--code-bg);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font:
+      12.5px/1.5 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+  }
+  .cmd button {
+    flex: none;
+  }
+  .answer {
+    display: grid;
+    gap: 8px;
+    border-top: 1px dashed var(--line);
+    padding-top: 12px;
+  }
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  button {
+    font: inherit;
+    font-size: 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    padding: 6px 14px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:hover {
+    border-color: var(--muted);
+  }
+  button:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
+  }
+  button.on {
+    background: var(--btn);
+    color: var(--btn-text);
+    border-color: var(--btn);
+  }
+  button.small {
+    font-size: 12.5px;
+    padding: 4px 10px;
+  }
+  /* 16px, or iOS Safari zooms the page when the note box is tapped. */
+  textarea {
+    font: inherit;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    min-height: 44px;
+    resize: vertical;
+    width: 100%;
+    max-width: 100%;
+  }
+  .saved {
+    font-size: 12.5px;
+    color: var(--muted);
+    min-height: 1em;
+  }
+  .empty,
+  .notice {
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin: 0;
+  }
+  .outcome {
+    background: var(--ok-bg);
+    color: var(--ok-fg);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 0;
+  }
+  .outcome b {
+    font-weight: 600;
+  }
+  .toggle {
+    background: none;
+    border: none;
+    padding: 4px 0;
+    color: var(--accent-strong);
+    font-size: 13px;
+    text-decoration: underline;
+  }
+  @media (max-width: 600px) {
+    body {
+      padding-block: 20px 48px;
+    }
+    .wrap {
+      gap: 22px;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    .card {
+      padding: 14px;
+      border-radius: 14px;
+      gap: 10px;
+    }
+    .empty,
+    .notice {
+      padding: 14px;
+    }
+    .title {
+      flex-basis: 100%;
+      font-size: 16.5px;
+    }
+    .bead {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      padding-top: 0;
+    }
+    .choices button {
+      flex: 1 1 0;
+      min-height: 44px;
+      padding-inline: 8px;
+    }
+    .cmd {
+      flex-direction: column;
+    }
+    .cmd button {
+      align-self: flex-start;
+      min-height: 36px;
+    }
+    .toggle {
+      min-height: 36px;
+    }
+    .bar {
+      flex-basis: 100%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar i {
+      transition: none;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>What I need from <span>you</span></h1>
+    <p class="lede">
+      Answer here whenever suits you. I read your answers from this page and act on them; you don't
+      need to tell me in the chat. Everything marked "built on" is already built on my
+      recommendation, so nothing waits for you except the steps only you can do.
+    </p>
+    <div class="meter">
+      <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+      <span class="chip" id="count">Loading…</span>
+    </div>
+  </header>
+  <p class="notice" id="notice" hidden></p>
+  <section id="steps-sec">
+    <h2>Steps only you can do <small id="steps-n"></small></h2>
+    <div id="steps" class="list"></div>
+  </section>
+  <section id="dec-sec">
+    <h2>Decisions <small id="dec-n"></small></h2>
+    <div id="decisions" class="list"></div>
+  </section>
+</div>
+
+<script>
+  const CHOICES = {
+    step: [
+      ["done", "Done"],
+      ["not-yet", "Not yet"],
+      ["stuck", "Stuck"],
+    ],
+    decision: [
+      ["approve", "Approve"],
+      ["change", "Change it"],
+      ["later", "Later"],
+    ],
+  };
+  let items = [],
+    answers = {},
+    db = null,
+    opened = new Set();
+
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === "class") n.className = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v);
+    }
+    for (const c of kids.flat())
+      if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+    return n;
+  }
+
+  function copyBtn(text) {
+    const b = el("button", { class: "small", type: "button" }, "Copy");
+    b.addEventListener("click", () => {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          b.textContent = "Copied";
+          setTimeout(() => (b.textContent = "Copy"), 1500);
+        })
+        .catch(() => {
+          const r = document.createRange();
+          r.selectNodeContents(b.previousSibling);
+          const s = getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+        });
+    });
+    return b;
+  }
+
+  function card(item) {
+    const a = answers[item.id] || {};
+    const kind = item.kind === "step" ? "step" : "decision";
+    const answered = !!a.choice && a.choice !== "not-yet" && a.choice !== "later";
+    const c = el("article", {
+      class: "card" + (answered ? " answered" : "") + (opened.has(item.id) ? " open" : ""),
+      id: "item-" + item.id,
+    });
+    const top = el(
+      "div",
+      { class: "top" },
+      el("h3", { class: "title" }, item.title),
+      el("span", { class: "bead" }, item.bead || ""),
+    );
+    c.append(top);
+    if (answered) {
+      const label = (CHOICES[kind].find(([v]) => v === a.choice) || [, a.choice])[1];
+      c.append(
+        el(
+          "div",
+          { class: "meter" },
+          el(
+            "span",
+            { class: "chip " + (a.choice === "approve" || a.choice === "done" ? "ok" : "warn") },
+            label,
+          ),
+          a.note ? el("span", { class: "why" }, a.note) : null,
+          el(
+            "button",
+            {
+              class: "toggle",
+              type: "button",
+              onclick: () => {
+                opened.has(item.id) ? opened.delete(item.id) : opened.add(item.id);
+                render();
+              },
+            },
+            opened.has(item.id) ? "Hide" : "Show / change",
+          ),
+        ),
+      );
+    }
+    if (item.outcome)
+      c.append(el("p", { class: "outcome" }, el("b", {}, "What I did: "), item.outcome));
+    const body = el("div", { class: "body" });
+    if (item.question)
+      body.append(
+        el(
+          "div",
+          {},
+          el("p", { class: "label" }, "Question"),
+          el("p", { class: "q" }, item.question),
+        ),
+      );
+    if (item.recommendation)
+      body.append(
+        el(
+          "div",
+          { class: "rec" },
+          el(
+            "p",
+            { class: "label" },
+            item.built ? "My recommendation (built on)" : "My recommendation",
+          ),
+          el("p", {}, item.recommendation),
+        ),
+      );
+    if (item.why) body.append(el("p", { class: "why" }, item.why));
+    if (Array.isArray(item.steps) && item.steps.length)
+      body.append(
+        el(
+          "ol",
+          { class: "steps" },
+          item.steps.map((s) => el("li", {}, s)),
+        ),
+      );
+    for (const cmd of item.commands || [])
+      body.append(el("div", { class: "cmd" }, el("code", {}, cmd), copyBtn(cmd)));
+    if (item.unblocks) body.append(el("p", { class: "why" }, "Unblocks: " + item.unblocks));
+
+    const noteId = "note-" + item.id;
+    const note = el("textarea", {
+      id: noteId,
+      rows: "2",
+      placeholder:
+        kind === "step"
+          ? "Anything I should know (optional)"
+          : "Your note, or what to change (optional)",
+    });
+    note.value = a.note || "";
+    const saved = el(
+      "span",
+      { class: "saved", "aria-live": "polite" },
+      a.updatedAt ? "Saved " + new Date(a.updatedAt).toLocaleString() : "",
+    );
+    const choices = el(
+      "div",
+      { class: "choices", role: "group", "aria-label": "Your answer" },
+      CHOICES[kind].map(([v, l]) =>
+        el(
+          "button",
+          {
+            type: "button",
+            class: a.choice === v ? "on" : "",
+            "aria-pressed": String(a.choice === v),
+            onclick: () => save(item.id, v, note.value, saved),
+          },
+          l,
+        ),
+      ),
+    );
+    note.addEventListener("change", () => {
+      if ((answers[item.id] || {}).choice)
+        save(item.id, answers[item.id].choice, note.value, saved);
+    });
+    body.append(el("div", { class: "answer" }, choices, note, saved));
+    c.append(body);
+    return c;
+  }
+
+  async function save(id, choice, note, savedEl) {
+    if (!db) {
+      savedEl.textContent = "Can't save here: open this page signed in to claude.ai.";
+      return;
+    }
+    savedEl.textContent = "Saving…";
+    const rec = { choice, note: note || "", updatedAt: new Date().toISOString() };
+    try {
+      await db.doc("answers/" + id).set(rec);
+      answers[id] = rec;
+      savedEl.textContent = "Saved";
+      render();
+    } catch (e) {
+      savedEl.textContent = "Not saved (" + ((e && e.code) || "error") + "). Try again.";
+    }
+  }
+
+  function render() {
+    const steps = items.filter((i) => i.kind === "step"),
+      decs = items.filter((i) => i.kind !== "step");
+    const done = (i) => {
+      const c = (answers[i.id] || {}).choice;
+      return !!c && c !== "not-yet" && c !== "later";
+    };
+    const boxS = document.getElementById("steps"),
+      boxD = document.getElementById("decisions");
+    boxS.replaceChildren(
+      ...(steps.length
+        ? steps.map(card)
+        : [el("p", { class: "empty" }, "Nothing for you to do right now.")]),
+    );
+    boxD.replaceChildren(
+      ...(decs.length ? decs.map(card) : [el("p", { class: "empty" }, "No decisions waiting.")]),
+    );
+    const n = items.length,
+      d = items.filter(done).length;
+    document.getElementById("count").textContent = n ? `${d} of ${n} answered` : "Nothing waiting";
+    document.getElementById("bar").style.width = n ? (100 * d) / n + "%" : "0";
+    document.getElementById("steps-n").textContent = steps.length
+      ? `${steps.filter(done).length} of ${steps.length} done`
+      : "";
+    document.getElementById("dec-n").textContent = decs.length
+      ? `${decs.filter(done).length} of ${decs.length} answered`
+      : "";
+  }
+
+  render();
+  (async () => {
+    try {
+      db = window.claude && window.claude.use ? await window.claude.use("db") : null;
+    } catch (e) {
+      db = null;
+    }
+    if (!db) {
+      const n = document.getElementById("notice");
+      n.hidden = false;
+      n.textContent =
+        "This page loads its items from claude.ai. Open it signed in to claude.ai to see and answer them.";
+      document.getElementById("count").textContent = "Not connected";
+      return;
+    }
+    db.collection("items")
+      .orderBy("order")
+      .onSnapshot(
+        (snap) => {
+          items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((i) => !i.hidden);
+          render();
+        },
+        () => {
+          document.getElementById("count").textContent = "Couldn't load items";
+        },
+      );
+    db.collection("answers").onSnapshot((snap) => {
+      answers = {};
+      for (const d of snap.docs) answers[d.id] = d.data();
+      render();
+    });
+  })();
+</script>

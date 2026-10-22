@@ -1,0 +1,68 @@
+name: deploy-dev
+
+# The fallback for deploying dev (CI decisions CI17): dev is deployed from the
+# orchestrator's Mac after merges (sst diff, the diff guard, sst deploy, the
+# smoke test; docs/runbooks/deployment.md, "The deploy pipeline"). This runs
+# the same steps on GitHub when someone starts it on main (Run workflow), as
+# the github-deploy-dev role through OIDC (infra/aws/github-deploy.yaml). No
+# GitHub environment: with one, the token's subject would name the
+# environment instead of main, which is what the role trusts. Never
+# cancelled; one dev deploy at a time. A deploy from the Mac at the same time
+# fails on SST's lock ("Locked"): run one at a time.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    # The role trusts main only; a run on another branch would fail at AWS.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # the deploy role's OIDC token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Skeleton: the role comes from deploy/accounts.json, which `/bootstrap
+      # accounts` fills. Empty, this step says so and every step after it is
+      # skipped, so the job ends green with nothing deployed.
+      - id: accounts
+        name: Accounts
+        env:
+          STAGE: dev
+        run: |
+          account=$(jq -r --arg stage "$STAGE" '.stages[$stage].account // empty' deploy/accounts.json)
+          region=$(jq -r '.region // empty' deploy/accounts.json)
+          if [ -z "$account" ] || [ -z "$region" ]; then
+            echo "::notice::deploy/accounts.json has no account or region for $STAGE: nothing is deployed until /bootstrap accounts fills it in."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The skeleton's demo routes are unauthenticated: no deploy until
+          # bootstrap step 6 replaces them. The template ships the state file and
+          # Finishing keeps it; no file means a project deleted .bootstrap/ after.
+          state=.bootstrap/state.json
+          if [ -f "$state" ] && [ "$(jq -r '.steps["6-replace-skeleton"].status // empty' "$state")" != "done" ]; then
+            echo "::error::The template's skeleton is still in place, and its demo routes are unauthenticated: nothing is deployed until /bootstrap replace-skeleton (step 6) replaces it."
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "role=arn:aws:iam::${account}:role/github-deploy-$STAGE" >> "$GITHUB_OUTPUT"
+          echo "region=$region" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          browsers: ""
+      - uses: ./.github/actions/deploy-stage
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          stage: dev
+          role: ${{ steps.accounts.outputs.role }}
+          region: ${{ steps.accounts.outputs.region }}

@@ -1,0 +1,33 @@
+{
+  "name": "@acme/deploy",
+  "private": true,
+  "type": "module",
+  "description": "The SST app: every stage's AWS resources. Accounts: accounts.json. Runbook: docs/runbooks/deployment.md.",
+  "scripts": {
+    "typegen": "ACME_TYPEGEN=1 sst install --stage ci",
+    "format": "prettier --check . --ignore-path ../.prettierignore",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.sst.json",
+    "knip": "knip",
+    "test": "vitest run",
+    "fix": "pnpm typegen && eslint . --fix && prettier --write . --ignore-path ../.prettierignore",
+    "check": "turbo run format lint typecheck knip test",
+    "sst:diff": "node scripts/sst.ts diff",
+    "diff-guard": "node scripts/diff-guard.ts",
+    "sst:deploy": "node scripts/sst.ts deploy",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "devDependencies": {
+    "@acme/backend": "workspace:*",
+    "@acme/config": "workspace:*",
+    "@acme/contracts": "workspace:*",
+    "@acme/frontend": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "10.11.0",
+    "knip": "6.38.0",
+    "sst": "4.17.1",
+    "terser": "5.16.9",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

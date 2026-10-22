@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/cli.ts", "src/rename-copy.ts", "src/state-cli.ts"],
+  "project": ["src/**/*.ts"],
+  "ignoreBinaries": ["bd", "prettier", "turbo"]
+}

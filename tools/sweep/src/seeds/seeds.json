@@ -1,0 +1,87 @@
+[
+  {
+    "id": "number",
+    "file": "docs/decisions/2026-09-28-aws-account-decisions.md",
+    "find": "admin in every account; prod sessions 3 hours, others 12",
+    "replace": "admin in every account; prod sessions 8 hours, others 12",
+    "kind": "conflict",
+    "refs": ["docs/decisions/2026-09-28-aws-account-decisions.md"]
+  },
+  {
+    "id": "node",
+    "file": "CLAUDE.md",
+    "find": "(`.nvmrc`, Node 24, the version the Lambdas run)",
+    "replace": "(`.nvmrc`, Node 22, the version the Lambdas run)",
+    "kind": "conflict",
+    "refs": ["CLAUDE.md", "docs/decisions/2026-10-06-ci-decisions.md"],
+    "accepts": ["conflict", "code-drift"]
+  },
+  {
+    "id": "pay-per-use",
+    "file": "docs/decisions/2026-09-28-aws-account-decisions.md",
+    "find": "breaks this and goes to the owner as a\nreview-batch item",
+    "replace": "is fine and agents may add it in dev\nwithout asking",
+    "kind": "conflict",
+    "refs": ["docs/decisions/2026-09-28-aws-account-decisions.md", "CLAUDE.md"]
+  },
+  {
+    "id": "library",
+    "file": "frontend/CLAUDE.md",
+    "find": "Motion is the only animation library;",
+    "replace": "GSAP is the only animation library;",
+    "kind": "conflict",
+    "refs": ["frontend/CLAUDE.md", "docs/decisions/2026-09-24-frontend-open-decisions.md"]
+  },
+  {
+    "id": "plan-rule",
+    "file": "docs/superpowers/plans/CLAUDE.md",
+    "find": "- **A task is one full green run, then a commit.**",
+    "replace": "- **A task may end with checks still red; commit when the feature is done.**",
+    "kind": "conflict",
+    "refs": ["docs/superpowers/plans/CLAUDE.md", "CLAUDE.md"]
+  },
+  {
+    "id": "version",
+    "file": "CLAUDE.md",
+    "find": "TypeScript packages (pnpm 10.34.5,",
+    "replace": "TypeScript packages (pnpm 10.36.0,",
+    "kind": "code-drift",
+    "refs": ["CLAUDE.md"],
+    "accepts": ["code-drift", "conflict"]
+  },
+  {
+    "id": "code-drift",
+    "file": "tools/local-check/src/lock.ts",
+    "find": "const MAX_HOLD_MS = 2 * 60 * 60_000;",
+    "replace": "const MAX_HOLD_MS = 30 * 60_000;",
+    "kind": "code-drift",
+    "accepts": ["code-drift", "conflict"],
+    "refs": ["tools/local-check/src/lock.ts", "tools/local-check/CLAUDE.md"]
+  },
+  {
+    "id": "duplicate",
+    "file": "backend/CLAUDE.md",
+    "find": "## The loop",
+    "replace": "## Installs\n\npnpm refuses package versions less than a day old; wait, and never add an exclusion to get around it.\n\n## The loop",
+    "kind": "duplicate",
+    "refs": ["backend/CLAUDE.md", "CLAUDE.md"]
+  },
+  {
+    "id": "supersession",
+    "file": "docs/decisions/2026-09-25-backend-decisions.md",
+    "find": "| B2  | DynamoDB",
+    "replace": "| B11 | A relational database (Aurora Serverless v2); DynamoDB is retired |\n| B2  | DynamoDB",
+    "kind": "unmarked-supersession",
+    "accepts": ["unmarked-supersession", "conflict"],
+    "refs": ["docs/decisions/2026-09-25-backend-decisions.md"]
+  },
+  {
+    "id": "memory",
+    "file": "snapshot/memories/explain-before-infra.md",
+    "find": "explain what and why and wait for the owner's go-ahead;",
+    "replace": "go ahead without waiting for the owner, and explain what and why afterwards;",
+    "kind": "conflict",
+    "accepts": ["conflict", "promote"],
+    "refs": ["memory:explain-before-infra", "CLAUDE.md"]
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "local_results": [
+    {
+      "title": "Example Co",
+      "data_id": "0x0000000000000a01:0x0000000000000b01",
+      "place_id": "ExamplePlaceId1",
+      "rating": 5,
+      "reviews": 29,
+      "type": "Software company",
+      "website": "https://example-co.example/"
+    },
+    {
+      "title": "Example Store - example store",
+      "data_id": "0x0000000000000a02:0x0000000000000b02",
+      "place_id": "ExamplePlaceId2",
+      "address": "18 Craft St, Springfield, 10001",
+      "rating": 5,
+      "reviews": 2,
+      "type": "Print shop"
+    },
+    {
+      "title": "Example Studio EXAMPLE",
+      "data_id": "0x0000000000000a03:0x0000000000000b03",
+      "place_id": "ExamplePlaceId3",
+      "address": "13 Main St, Springfield",
+      "rating": 3.7,
+      "reviews": 3,
+      "type": "Design studio"
+    },
+    {
+      "title": "SAMPLE PRINT",
+      "data_id": "0x0000000000000a04:0x0000000000000b04",
+      "place_id": "ExamplePlaceId4",
+      "address": "23 Craft St, Shelbyville, 20002",
+      "rating": 5,
+      "reviews": 2,
+      "type": "Print shop",
+      "website": "https://www.sampleprint.example/"
+    }
+  ]
+}

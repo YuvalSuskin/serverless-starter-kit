@@ -1,0 +1,8 @@
+name: Alpha
+slug: alpha
+aliases: [Alpha App]
+domains: [alpha.example]
+confirmed: 2026-09-29
+listings:
+  google: null
+  site: [https://alpha.example/pricing]

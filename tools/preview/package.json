@@ -1,0 +1,24 @@
+{
+  "name": "@acme/preview",
+  "private": true,
+  "type": "module",
+  "description": "pnpm preview: run any branch locally on its own URL. Node built-ins, plus the sweep's bead-prefix reader; Node runs the TypeScript source directly.",
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.prettierignore",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "knip": "knip",
+    "test": "vitest run",
+    "fix": "eslint . --fix && prettier --write . --ignore-path ../../.prettierignore",
+    "check": "turbo run format lint typecheck knip test"
+  },
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@acme/sweep": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "10.11.0",
+    "knip": "6.38.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

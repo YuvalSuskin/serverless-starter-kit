@@ -1,0 +1,4 @@
+{
+  "fewer-questions": "Owner preference (2026-09-29, design guides work): do not ask many questions. After the brief is agreed, decide what can be decided, state the choice and continue; bring the owner only what is truly theirs (taste verdicts, user-visible wording), batched and rare. Rounds of multiple-choice questions on small wordings were too much.",
+  "pay-per-use": "Owner principle (2026-09-30): Acme is serverless and pay per use; an idle system should cost close to nothing. Accepted standing costs: stored bytes (S3), a hosted zone, keys. Choose the cheapest pay-as-you-go option. Anything billed by the hour while unused (NAT gateway, DB/cache instance, provisioned concurrency, running container, flat-rate plan) goes to the owner as a review-batch item. Written in root CLAUDE.md, infra/CLAUDE.md and A9."
+}

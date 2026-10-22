@@ -1,0 +1,47 @@
+name: Set up
+description: pnpm, Node from .nvmrc, dependencies, and cached Playwright browsers.
+inputs:
+  browsers:
+    # The Vitest browser projects need Chromium only; each e2e job installs
+    # its own project's engine. Empty: none.
+    description: Playwright browsers to install, space-separated.
+    default: chromium
+runs:
+  using: composite
+  steps:
+    # Pinned by commit (Dependabot keeps them current): the deploy jobs run
+    # this with AWS credentials. pnpm's version comes from package.json
+    # "packageManager".
+    - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version-file: .nvmrc
+    # pnpm's store, under a key only full installs write. setup-node's
+    # `cache: pnpm` keys by the lockfile alone, so partial installs (ci.yml's
+    # proof job installs only turbo) would save it first and most packages be
+    # downloaded again.
+    - id: pnpm-store
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+    - id: playwright
+      if: inputs.browsers != ''
+      run: echo "version=$(pnpm --filter @acme/frontend exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - id: playwright-cache
+      if: inputs.browsers != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ inputs.browsers }}
+    - if: inputs.browsers != '' && steps.playwright-cache.outputs.cache-hit != 'true'
+      run: pnpm --filter @acme/frontend exec playwright install --with-deps ${{ inputs.browsers }}
+      shell: bash
+    - if: inputs.browsers != '' && steps.playwright-cache.outputs.cache-hit == 'true'
+      run: pnpm --filter @acme/frontend exec playwright install-deps ${{ inputs.browsers }}
+      shell: bash

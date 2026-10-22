@@ -1,0 +1,8 @@
+{
+  "name": "@acme/design",
+  "private": true,
+  "description": "Acme design tokens. The exports map below is the ENTIRE surface other components may depend on.",
+  "exports": {
+    "./tokens.css": "./tokens/tokens.css"
+  }
+}

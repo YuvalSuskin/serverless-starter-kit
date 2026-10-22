@@ -1,0 +1,169 @@
+{
+  "<region>": {
+    "step": "1-basics",
+    "files": [
+      "docs/decisions/2026-09-28-aws-account-decisions.md",
+      "docs/runbooks/deployment.md",
+      "infra/aws/README.md",
+      "infra/aws/region-guardrail-scp.json",
+      "infra/CLAUDE.md",
+      "infra/README.md"
+    ]
+  },
+  "<domain>": {
+    "step": "1-basics",
+    "files": [
+      "deploy/CLAUDE.md",
+      "deploy/src/stage.ts",
+      "docs/decisions/2026-09-28-aws-account-decisions.md",
+      "docs/decisions/2026-10-01-sst-dev-deployment-decisions.md",
+      "docs/runbooks/deployment.md",
+      "infra/aws/README.md",
+      "infra/CLAUDE.md"
+    ]
+  },
+  "<project>": {
+    "step": "1-basics",
+    "files": [
+      "docs/decisions/2026-09-28-aws-account-decisions.md",
+      "docs/decisions/2026-10-01-sst-dev-deployment-decisions.md",
+      "docs/runbooks/deployment.md"
+    ]
+  },
+  "<billing-unit>": {
+    "step": "2-product-brief",
+    "files": [
+      "CLAUDE.md"
+    ]
+  },
+  "<owner-inbox-url>": {
+    "step": "3-owner-setup",
+    "files": [
+      ".beads/seed-memories.json",
+      ".claude/skills/owner-inbox/SKILL.md",
+      "CLAUDE.md"
+    ]
+  },
+  "<project-account>": {
+    "step": "3-owner-setup",
+    "files": [
+      ".beads/seed-memories.json"
+    ]
+  },
+  "<registrar-exception>": {
+    "step": "3-owner-setup",
+    "files": [
+      ".beads/seed-memories.json"
+    ]
+  },
+  "<github-owner>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<github-owner-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<github-repo>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<github-repo-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<dev-account-id>": {
+    "step": "7-accounts",
+    "files": [
+      "docs/runbooks/deployment.md",
+      "infra/aws/README.md",
+      "infra/CLAUDE.md"
+    ]
+  },
+  "<prod-account-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<management-account-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<org-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<root-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<ou-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<opt-out-policy-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<scp-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<sso-start-url>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<sso-instance-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<identity-store-id>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<owner-name>": {
+    "step": "7-accounts",
+    "files": [
+      "infra/aws/README.md"
+    ]
+  },
+  "<platform-resources>": {
+    "step": "7-accounts",
+    "files": [
+      ".beads/seed-memories.json"
+    ]
+  },
+  "<dev-stage-name>": {
+    "step": "7-accounts",
+    "files": [
+      ".beads/seed-memories.json"
+    ]
+  }
+}

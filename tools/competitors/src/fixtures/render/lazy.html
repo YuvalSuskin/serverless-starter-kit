@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head><meta charset="utf-8"><title>Price list</title>
+<style>.item { height: 400px; }</style>
+<script>window.analytics = "never in the text";</script>
+</head>
+<body>
+<nav>Main menu</nav>
+<div id="consent">We use cookies <button id="accept">Accept all</button> <button id="reject">Reject all</button></div>
+<h1>Plans</h1>
+<ul><li>Shared space: $350</li><li>Backup: $500</li></ul>
+<div id="list"><div class="item">Item 1</div><div class="item">Item 2</div><div class="item">Item 3</div></div>
+<div id="more-items"></div>
+<button id="more">Show more</button>
+<footer>All rights reserved</footer>
+<script>
+  let batch = 0;
+  window.addEventListener("scroll", () => {
+    if (batch >= 2 || window.innerHeight + window.scrollY < document.body.scrollHeight - 50) return;
+    batch += 1;
+    const item = document.createElement("div");
+    item.className = "item";
+    item.textContent = "Loaded on scroll " + batch;
+    document.getElementById("list").append(item);
+  });
+  document.getElementById("more").addEventListener("click", () => {
+    const clicks = document.querySelectorAll("#more-items p").length;
+    document.getElementById("more-items").insertAdjacentHTML("beforeend", "<p>Hidden item " + (clicks + 1) + "</p>");
+    if (clicks + 1 === 2) document.getElementById("more").remove();
+  });
+  document.getElementById("reject").addEventListener("click", () => {
+    document.getElementById("consent").remove();
+    document.body.insertAdjacentHTML("beforeend", "<p>Cookies: rejected</p>");
+  });
+  document.getElementById("accept").addEventListener("click", () => {
+    document.getElementById("consent").remove();
+    document.body.insertAdjacentHTML("beforeend", "<p>Cookies: accepted</p>");
+  });
+</script>
+</body>
+</html>

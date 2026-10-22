@@ -1,0 +1,409 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  GitHub Actions deploys one acme SST stage into this account through
+  OIDC, with no stored keys: the role github-deploy-<stage>, and, once per
+  account, GitHub's OIDC provider and the permissions boundary every app role
+  carries. How to apply and change it: infra/aws/README.md, "GitHub deploy
+  role". The live role is created from this file: change the file first, then
+  apply.
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]{0,30}$"
+    Description: The one SST stage this role deploys (dev in acme-dev, production in acme-prod).
+  AppInitial:
+    Type: String
+    AllowedPattern: "^[a-z]$"
+    Description: >-
+      The first letter of the app's name (acme: a). SST names every resource
+      <app>-<stage>-..., or with the app's name cut short when the whole would
+      be too long ("ac-dev-", "a-dev-"), so every pattern below is this
+      letter, a star and the stage.
+  TrustedSubjects:
+    Type: CommaDelimitedList
+    Description: >-
+      The exact OIDC sub claims allowed to assume the role (any one of them).
+      AWS can test only sub and aud, so the branch, environment and workflow
+      the role trusts must all be in sub.
+  CreateAccountResources:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: >-
+      true for the account's first stack: it creates the OIDC provider and the
+      app roles' permissions boundary, which every stage in the account shares.
+  ManagesDomain:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: >-
+      true when the stage has a domain (`domain` in deploy/accounts.json): its
+      Route 53 records, ACM certificate and SES identity.
+  ShortNamePattern:
+    Type: String
+    Default: ""
+    AllowedPattern: "^([a-z][a-z0-9]*\\*-\\*)?$"
+    Description: >-
+      Extra name pattern for the stage's functions, log groups, queues, rules
+      and roles whose SST names are shortened. SST's prefixName drops the app
+      name and cuts the stage when app, stage and name don't fit (64 for a
+      function): "acme-production-<long name>" becomes "producti-<name>",
+      which <initial>*-<stage>-* misses. "p*-*" for production; empty for dev,
+      whose short stage keeps a cut app name ("ac-dev-") that <initial>*-dev-*
+      matches.
+
+Conditions:
+  AccountResources: !Equals [!Ref CreateAccountResources, "true"]
+  Domain: !Equals [!Ref ManagesDomain, "true"]
+  ShortNames: !Not [!Equals [!Ref ShortNamePattern, ""]]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: AccountResources
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      Tags:
+        - { Key: acme:app, Value: acme }
+        - { Key: acme:part, Value: github-deploy }
+
+  # The most any app role may do, whatever its own policies say: SST gives
+  # every role it creates this boundary (deploy/sst.config.ts), and the deploy
+  # role may create or change a role only with it. So a workflow on main
+  # cannot make an admin role, or one that reaches IAM, STS or another
+  # account's data. Its name is fixed: deploy/src/stage.ts, appRoleBoundary.
+  AppRoleBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: AccountResources
+    Properties:
+      ManagedPolicyName: acme-app-role-boundary
+      Description: The most the role of a function in acme may do (infra/aws/github-deploy.yaml)
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AppData
+            Effect: Allow
+            Action:
+              - dynamodb:*
+              - s3:*
+              - sqs:*
+              - sns:Publish
+            Resource:
+              - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppInitial}*
+              - !Sub arn:aws:s3:::${AppInitial}*
+              - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${AppInitial}*
+              - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppInitial}*
+          - Sid: Logs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+          - Sid: Cache
+            Effect: Allow
+            Action: cloudfront:CreateInvalidation
+            Resource: "*"
+          # The stage's email: sent as an identity of the account, through an
+          # acme-<stage>-team or -notices configuration set (deploy/src/email.ts
+          # names them in full, so SST never shortens them). identity/* because
+          # SES's sandbox also checks the recipient's verified identity; each
+          # API role narrows it to its own (deploy/src/email.ts). The mailer
+          # calls SendEmail only (SES v2, Content.Simple), never SendRawEmail.
+          - Sid: Email
+            Effect: Allow
+            Action: ses:SendEmail
+            Resource:
+              - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+              - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/acme-*
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # Named github-deploy-...; for an app starting with "g" the grants below would
+      # match it, and the NeverItselfOrPeople Deny (github-deploy-*) is what protects it.
+      RoleName: !Sub github-deploy-${Stage}
+      Description: !Sub GitHub Actions deploys the acme ${Stage} stage (infra/aws/github-deploy.yaml)
+      MaxSessionDuration: 7200 # production's first deploy (a new distribution and certificate) can be long
+      Tags:
+        - { Key: acme:app, Value: acme }
+        - { Key: acme:part, Value: github-deploy }
+        - { Key: acme:deploys-stage, Value: !Ref Stage }
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - AccountResources
+                - !Ref GitHubOidcProvider
+                - !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Ref TrustedSubjects
+      Policies:
+        - PolicyName: deploy-stage
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: WhoAmI
+                Effect: Allow
+                Action: sts:GetCallerIdentity
+                Resource: "*"
+              # SST's home in the account: state, secrets, function code,
+              # passphrases; created by SST on an account's first deploy.
+              - Sid: SstHome
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - arn:aws:s3:::sst-state-*
+                  - arn:aws:s3:::sst-state-*/*
+                  - arn:aws:s3:::sst-asset-*
+                  - arn:aws:s3:::sst-asset-*/*
+              - Sid: SstParameters
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:AddTagsToResource
+                  - ssm:ListTagsForResource
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sst/*
+              - Sid: SstContainerRepository
+                Effect: Allow
+                Action: ecr:*
+                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/sst-asset
+              - Sid: ListBuckets
+                Effect: Allow
+                Action: s3:ListAllMyBuckets
+                Resource: "*"
+              # The stage's own resources. SST names them acme-<stage>-..., or with
+              # the app's name cut short (ac-dev-..., acm-dev-...).
+              - Sid: StageBuckets
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub arn:aws:s3:::${AppInitial}*-${Stage}-*
+                  - !Sub arn:aws:s3:::${AppInitial}*-${Stage}-*/*
+              - Sid: StageTable
+                Effect: Allow
+                Action: dynamodb:*
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppInitial}*-${Stage}-*
+              - Sid: StageFunctions
+                Effect: Allow
+                Action: lambda:*
+                Resource:
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ShortNamePattern}", !Ref AWS::NoValue]
+              - Sid: EventSourceMappings
+                Effect: Allow
+                Action:
+                  - lambda:CreateEventSourceMapping
+                  - lambda:GetEventSourceMapping
+                  - lambda:UpdateEventSourceMapping
+                  - lambda:DeleteEventSourceMapping
+                  - lambda:ListEventSourceMappings
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:ListTags
+                Resource: "*"
+              - Sid: StageQueuesAndTopics
+                Effect: Allow
+                Action:
+                  - sqs:*
+                  - sns:*
+                Resource:
+                  - !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${ShortNamePattern}", !Ref AWS::NoValue]
+                  - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ShortNamePattern}", !Ref AWS::NoValue]
+              # A schedule (SST's Cron): an EventBridge rule SST names
+              # acme-<stage>-..., which invokes the stage's own function.
+              - Sid: StageRules
+                Effect: Allow
+                Action:
+                  - events:DeleteRule
+                  - events:DescribeRule
+                  - events:ListTagsForResource
+                  - events:ListTargetsByRule
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                  - events:TagResource
+                  - events:UntagResource
+                Resource:
+                  - !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${ShortNamePattern}", !Ref AWS::NoValue]
+              - Sid: StageAlarms
+                Effect: Allow
+                Action: cloudwatch:*
+                Resource: !Sub arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:acme-${Stage}-*
+              - Sid: DescribeAlarms
+                Effect: Allow
+                Action: cloudwatch:DescribeAlarms
+                Resource: "*"
+              - Sid: StageLogGroups
+                Effect: Allow
+                Action: logs:*
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ShortNamePattern}", !Ref AWS::NoValue]
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/vendedlogs/apis/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/vendedlogs/apis/${ShortNamePattern}", !Ref AWS::NoValue]
+              # HTTP API access logs are configured through CloudWatch Logs' delivery API.
+              - Sid: LogDelivery
+                Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                Resource: "*"
+              # The functions' roles: only the stage's, read and tidied freely,
+              # but created or given permissions only with the boundary above;
+              # only Lambda's basic execution policy attached; only passed to
+              # Lambda.
+              - Sid: StageRolesRead
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListRoleTags
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListInstanceProfilesForRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:DeleteRole
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:iam::${AWS::AccountId}:role/${ShortNamePattern}", !Ref AWS::NoValue]
+              - Sid: StageRolesWithinBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:iam::${AWS::AccountId}:role/${ShortNamePattern}", !Ref AWS::NoValue]
+                Condition:
+                  StringEquals:
+                    iam:PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/acme-app-role-boundary
+              - Sid: StageRolesBasicExecutionOnly
+                Effect: Allow
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:iam::${AWS::AccountId}:role/${ShortNamePattern}", !Ref AWS::NoValue]
+                Condition:
+                  StringEquals:
+                    iam:PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/acme-app-role-boundary
+                  ArnEquals:
+                    iam:PolicyARN: arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              - Sid: PassStageRolesToLambda
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${AppInitial}*-${Stage}-*
+                  - !If [ShortNames, !Sub "arn:aws:iam::${AWS::AccountId}:role/${ShortNamePattern}", !Ref AWS::NoValue]
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+              # Services whose resources have random ids: the account and region only.
+              - Sid: RandomlyNamed
+                Effect: Allow
+                Action:
+                  - apigateway:*
+                  - cloudfront:*
+                  - cloudfront-keyvaluestore:*
+                Resource: "*"
+              - !If
+                - Domain
+                - Sid: StageDomain
+                  Effect: Allow
+                  Action:
+                    - route53:*
+                    - acm:*
+                  Resource: "*"
+                - !Ref AWS::NoValue
+              # The stage's email, with its domain: the domain identity with
+              # Easy DKIM and its MAIL FROM, and the two configuration sets
+              # acme-<stage>-team and -notices,
+              # named in full (deploy/src/email.ts), so ShortNamePattern never
+              # applies. Their DNS records are StageDomain's Route 53, their
+              # alarms StageAlarms'. Managing only: no Send action, and no
+              # account-wide setting (production access, the suppression
+              # list) changes here. The event destinations are for a
+              # feedback worker, should the project add one.
+              - !If
+                - Domain
+                - Sid: StageEmail
+                  Effect: Allow
+                  Action:
+                    - ses:CreateEmailIdentity
+                    - ses:GetEmailIdentity
+                    - ses:DeleteEmailIdentity
+                    - ses:PutEmailIdentityDkimAttributes
+                    - ses:PutEmailIdentityDkimSigningAttributes
+                    - ses:PutEmailIdentityFeedbackAttributes
+                    - ses:PutEmailIdentityMailFromAttributes
+                    - ses:PutEmailIdentityConfigurationSetAttributes
+                    - ses:CreateConfigurationSet
+                    - ses:GetConfigurationSet
+                    - ses:DeleteConfigurationSet
+                    - ses:PutConfigurationSetDeliveryOptions
+                    - ses:PutConfigurationSetReputationOptions
+                    - ses:PutConfigurationSetSendingOptions
+                    - ses:PutConfigurationSetSuppressionOptions
+                    - ses:PutConfigurationSetTrackingOptions
+                    - ses:PutConfigurationSetVdmOptions
+                    - ses:CreateConfigurationSetEventDestination
+                    - ses:GetConfigurationSetEventDestinations
+                    - ses:UpdateConfigurationSetEventDestination
+                    - ses:DeleteConfigurationSetEventDestination
+                    - ses:TagResource
+                    - ses:UntagResource
+                    - ses:ListTagsForResource
+                  Resource:
+                    - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+                    - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/acme-${Stage}-*
+                - !Ref AWS::NoValue
+              # Belt and braces: never this role, the provider, the boundary,
+              # a person's access, or a role without the boundary.
+              - Sid: NeverItselfOrPeople
+                Effect: Deny
+                Action: iam:*
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/github-deploy-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:policy/*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/AWSReservedSSO_*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/aws-reserved/*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/OrganizationAccountAccessRole
+                  - !Sub arn:aws:iam::${AWS::AccountId}:user/*
+              - Sid: NeverDropTheBoundary
+                Effect: Deny
+                Action: iam:DeleteRolePermissionsBoundary
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: What the workflow assumes (role-to-assume).
+    Value: !GetAtt DeployRole.Arn

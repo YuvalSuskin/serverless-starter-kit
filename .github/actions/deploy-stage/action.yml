@@ -1,0 +1,137 @@
+name: Deploy a stage
+description: >-
+  sst diff, the diff guard, then sst deploy and the smoke test for one stage,
+  as its GitHub deploy role. The job
+  checks out the commit, runs ./.github/actions/setup, and grants
+  id-token: write. Actions are pinned by commit: this job holds AWS
+  credentials.
+inputs:
+  stage:
+    description: The SST stage (dev, or production).
+    required: true
+  role:
+    description: The stage account's github-deploy-<stage> role ARN (infra/aws/github-deploy.yaml).
+    required: true
+  apply:
+    description: '"false" plans only (diff and guard), for the owner to read before a second run applies.'
+    default: "true"
+  region:
+    description: The AWS region the role is assumed in (deploy/accounts.json).
+    required: true
+  session-seconds:
+    description: How long the role's credentials last; at most the role's MaxSessionDuration (7200).
+    default: "3600"
+  first-deploy:
+    description: '"true" only on the stage''s very first deploy: the guard then allows creating its data resources.'
+    default: "false"
+runs:
+  using: composite
+  steps:
+    # What AWS will be shown: the token's sub claim only, never the token.
+    # A trust failure in the next step is read against this line.
+    - name: OIDC subject
+      shell: bash
+      run: |
+        token=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+        payload=$(cut -d. -f2 <<<"$token" | tr '_-' '/+')
+        while (( ${#payload} % 4 )); do payload="$payload="; done
+        echo "OIDC subject: $(base64 -d <<<"$payload" | jq -r .sub)"
+    - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+      with:
+        role-to-assume: ${{ inputs.role }}
+        role-session-name: github-${{ github.run_id }}
+        aws-region: ${{ inputs.region }}
+        role-duration-seconds: ${{ inputs.session-seconds }}
+    # The diff builds the backend and the site, then plans; kept for the guard.
+    - id: diff
+      name: sst diff
+      shell: bash
+      working-directory: deploy
+      env:
+        STAGE: ${{ inputs.stage }}
+      run: |
+        set -o pipefail
+        pnpm sst:diff --stage "$STAGE" 2>&1 | tee "$RUNNER_TEMP/sst-diff.txt"
+    - id: guard
+      name: Diff guard
+      shell: bash
+      working-directory: deploy
+      env:
+        STAGE: ${{ inputs.stage }}
+        FIRST_DEPLOY: ${{ inputs.first-deploy }}
+      run: |
+        set -o pipefail
+        first=()
+        if [ "$FIRST_DEPLOY" = "true" ]; then first=(--first-deploy); fi
+        pnpm diff-guard --stage "$STAGE" "${first[@]}" "$RUNNER_TEMP/sst-diff.txt" 2>&1 | tee "$RUNNER_TEMP/diff-guard.txt"
+    - id: deploy
+      name: sst deploy
+      if: inputs.apply == 'true'
+      shell: bash
+      working-directory: deploy
+      env:
+        STAGE: ${{ inputs.stage }}
+      run: pnpm sst:deploy --stage "$STAGE"
+    - id: smoke
+      name: Smoke test
+      if: inputs.apply == 'true'
+      shell: bash
+      working-directory: deploy
+      env:
+        STAGE: ${{ inputs.stage }}
+      run: pnpm smoke --stage "$STAGE"
+    - name: Report
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        STAGE: ${{ inputs.stage }}
+        APPLY: ${{ inputs.apply }}
+        DIFF: ${{ steps.diff.outcome }}
+        GUARD: ${{ steps.guard.outcome }}
+        DEPLOY: ${{ steps.deploy.outcome }}
+        SMOKE: ${{ steps.smoke.outcome }}
+      run: |
+        # The commit checked out: deploy-production.yml releases one that may
+        # not be the workflow's own ($GITHUB_SHA).
+        sha=$(git rev-parse HEAD)
+        # What a plan is read for: the diff and the guard's verdict, as the
+        # log shows them, without terminal colours. A summary holds 1 MiB.
+        shown() {
+          if [ -s "$1" ]; then
+            echo
+            echo "<details$3><summary>$2</summary>"
+            echo
+            if [ "$(wc -c < "$1")" -gt 400000 ]; then
+              echo "Its last 400 kB only: the whole is in the step's log."
+              echo
+            fi
+            echo '~~~~~~~~'
+            sed -e 's/\x1b\[[0-9;?]*[A-Za-z]//g' "$1" | tail -c 400000
+            echo '~~~~~~~~'
+            echo
+            echo "</details>"
+          fi
+        }
+        open=""
+        if [ "$APPLY" != "true" ]; then open=" open"; fi
+        {
+          echo "### Deploy of \`$STAGE\` at $sha"
+          echo
+          echo "| Step | Outcome |"
+          echo "| ---- | ------- |"
+          echo "| sst diff | ${DIFF:-not run} |"
+          echo "| Diff guard | ${GUARD:-not run} |"
+          echo "| sst deploy | ${DEPLOY:-not run} |"
+          echo "| Smoke test | ${SMOKE:-not run} |"
+          shown "$RUNNER_TEMP/diff-guard.txt" "Diff guard" "$open"
+          shown "$RUNNER_TEMP/sst-diff.txt" "sst diff" "$open"
+          if [ "$APPLY" != "true" ]; then
+            echo
+            echo "Plan only. To apply this plan, run the workflow again with apply on and sha \`$sha\`."
+          fi
+          if [ "$DEPLOY" = "failure" ] || [ "$SMOKE" = "failure" ]; then
+            echo
+            echo "Rollback and stuck deploys: docs/runbooks/deployment.md, *The deploy pipeline*."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

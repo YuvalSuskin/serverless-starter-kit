@@ -1,0 +1,29 @@
+{
+  "name": "@acme/config",
+  "private": true,
+  "type": "module",
+  "description": "Shared ESLint base and tsconfig bases for every TypeScript package (backend scaffold spec \u00a713.3). Prettier stays at the repo root.",
+  "exports": {
+    "./eslint": "./eslint.mjs",
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/node.json": "./tsconfig/node.json"
+  },
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.prettierignore",
+    "fix": "prettier --write . --ignore-path ../../.prettierignore"
+  },
+  "dependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@vitest/eslint-plugin": "1.6.27",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-perfectionist": "5.12.1",
+    "eslint-plugin-sonarjs": "4.2.1",
+    "typescript-eslint": "8.70.1"
+  },
+  "devDependencies": {
+    "eslint": "10.11.0"
+  },
+  "peerDependencies": {
+    "eslint": "10.11.0"
+  }
+}

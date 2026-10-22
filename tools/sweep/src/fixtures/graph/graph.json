@@ -1,0 +1,166 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "upload_limit_change_flow",
+        "label": "Upload limit decision-to-change flow",
+        "nodes": ["docs_decisions_log_b4", "docs_product_uploads_add_l1", "snapshot_beads_acme_x1"],
+        "relation": "participate_in",
+        "confidence": "INFERRED",
+        "confidence_score": 0.8,
+        "source_file": "docs/decisions/log.md"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "backend_src_upload_accept",
+      "label": "accept()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "file_type": "code",
+      "norm_label": "accept()",
+      "source_file": "backend/src/upload.ts",
+      "source_location": "L2"
+    },
+    {
+      "id": "backend_src_upload",
+      "label": "upload.ts",
+      "_origin": "ast",
+      "community": 0,
+      "file_type": "code",
+      "norm_label": "upload.ts",
+      "source_file": "backend/src/upload.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "backend_src_upload_max_bytes",
+      "label": "MAX_BYTES",
+      "_origin": "ast",
+      "community": 0,
+      "file_type": "code",
+      "norm_label": "max_bytes",
+      "source_file": "backend/src/upload.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "docs_decisions_log_b4",
+      "label": "B4: Upload limit is 20 MB",
+      "author": null,
+      "captured_at": null,
+      "community": 1,
+      "contributor": null,
+      "file_type": "document",
+      "norm_label": "b4: upload limit is 20 mb",
+      "rationale": null,
+      "source_file": "docs/decisions/log.md",
+      "source_location": null,
+      "source_url": null
+    },
+    {
+      "id": "docs_product_uploads_add_l1",
+      "label": "ADD-L1: Upload limit 20 MB",
+      "author": null,
+      "captured_at": null,
+      "community": 1,
+      "contributor": null,
+      "file_type": "document",
+      "norm_label": "add-l1: upload limit 20 mb",
+      "rationale": null,
+      "source_file": "docs/product/uploads.md",
+      "source_location": null,
+      "source_url": null
+    },
+    {
+      "id": "snapshot_beads_acme_x1",
+      "label": "acme-x1: Raise upload limit to 50 MB",
+      "author": null,
+      "captured_at": null,
+      "community": 1,
+      "contributor": null,
+      "file_type": "document",
+      "norm_label": "acme-x1: raise upload limit to 50 mb",
+      "rationale": null,
+      "source_file": "snapshot/beads/acme-x1.md",
+      "source_location": null,
+      "source_url": null
+    }
+  ],
+  "links": [
+    {
+      "source": "backend_src_upload",
+      "target": "backend_src_upload_max_bytes",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/src/upload.ts",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_upload",
+      "target": "backend_src_upload_accept",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "backend/src/upload.ts",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "snapshot_beads_acme_x1",
+      "target": "docs_decisions_log_b4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "snapshot/beads/acme-x1.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "snapshot_beads_acme_x1",
+      "target": "docs_product_uploads_add_l1",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.95,
+      "source_file": "snapshot/beads/acme-x1.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_product_uploads_add_l1",
+      "target": "docs_decisions_log_b4",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 0.98,
+      "source_file": "docs/product/uploads.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_upload_max_bytes",
+      "target": "docs_product_uploads_add_l1",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.6,
+      "source_file": "backend/src/upload.ts",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "upload_limit_change_flow",
+      "label": "Upload limit decision-to-change flow",
+      "nodes": ["docs_decisions_log_b4", "docs_product_uploads_add_l1", "snapshot_beads_acme_x1"],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "docs/decisions/log.md"
+    }
+  ]
+}

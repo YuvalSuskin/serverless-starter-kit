@@ -1,0 +1,9 @@
+{
+  "services": {
+    "default": {
+      "opt_out_policy": {
+        "@@assign": "optOut"
+      }
+    }
+  }
+}

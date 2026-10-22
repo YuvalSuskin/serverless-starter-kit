@@ -1,0 +1,23 @@
+# design/ is hand-written brand material and generated output; never reformat it.
+design/
+.beads/
+docs/
+pnpm-lock.yaml
+**/.next/
+**/storybook-static/
+**/coverage/
+**/test-results/
+**/playwright-report/
+**/next-env.d.ts
+**/.turbo/
+**/dist/
+**/.sst/
+deploy/.build/
+# npm writes it; a function that installs its own dependencies (a Lambda
+# bundled with npm) installs from it byte for byte.
+deploy/functions/**/package-lock.json
+**/.open-next/
+**/sst-env.d.ts
+
+# Recorded pages and hand-made data for the competitors tool: kept byte for byte.
+tools/competitors/src/fixtures/

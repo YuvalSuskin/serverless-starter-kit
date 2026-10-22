@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`stats: review follow-ups > matches the full output it had when reviewed (a lock on the layout templates rely on) 1`] = `
+"### Evidence
+
+| Source | Current | Gone | First posted | Latest posted |
+| --- | --- | --- | --- | --- |
+| google | 1 | 1 | 2025-12-25 | 2025-12-25 |
+
+Latest review: 2025-12-25
+Reviews in the 12 months to 2026-10-05: 1
+Site claims: 1 current, 1 superseded
+Tagged: 2 of 4 records
+Last collected: 2026-09-29
+
+### Personas
+
+| Persona | Reviews | Claimed on site | Acme actor |
+| --- | --- | --- | --- |
+| buyer | 1 | yes | none |
+
+### Features
+
+| Feature | Name | Stage | Claimed | Reviews | Positive | Negative | Mixed | Neutral | Glossary |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| auto-tag | Auto tag | content | no | 1 | 0 | 0 | 1 | 0 | — |
+| price | Price | aspect | no | 1 | 0 | 1 | 0 | 0 | — |
+| contributions | Shared list | content | yes | 0 | 0 | 0 | 0 | 0 | shared-list |
+
+Reviews counts reviews; the sentiment columns count mentions, and one review may mention a feature more than once.
+
+### Praise
+
+none
+
+### Pain
+
+- auto-tag (Auto tag): 1 review, latest 2025-12-25 — google-694cfcb1eeee0d9b184fad86
+- price (Price): 1 review, latest 2025-12-25 — google-694cfcb1eeee0d9b184fad86
+
+### Missing
+
+none
+
+### Prices
+
+- Current: $400 per shared list (https://alpha.example/pricing, since 2026-09-29; site-bbbbbbbbbb)
+- Earlier: $350 per shared list (https://alpha.example/pricing, 2026-09-01 to 2026-09-29; site-aaaaaaaaaa)
+"
+`;
+
+exports[`stats: review follow-ups > matches the full output it had when reviewed (a lock on the layout templates rely on) 2`] = `
+"### Relevance
+
+| Competitor | Latest review | Last 12 months | Total reviews |
+| --- | --- | --- | --- |
+| beta | 2026-09-01 | 1 | 2 |
+| alpha | 2025-12-25 | 1 | 1 |
+| gamma | none | 0 | 0 |
+
+### Features
+
+#### content · auto-tag (Auto tag)
+
+| Competitor | Claimed on site | Positive | Negative | Mixed | Missing |
+| --- | --- | --- | --- | --- | --- |
+| alpha | no | 0 | 0 | 1 | 0 |
+| beta | no | 1 | 0 | 0 | 0 |
+
+#### content · contributions (Shared list)
+
+| Competitor | Claimed on site | Positive | Negative | Mixed | Missing |
+| --- | --- | --- | --- | --- | --- |
+| alpha | yes | 0 | 0 | 0 | 0 |
+| beta | no | 0 | 0 | 0 | 1 |
+
+#### aspect · price (Price)
+
+| Competitor | Claimed on site | Positive | Negative | Mixed | Missing |
+| --- | --- | --- | --- | --- | --- |
+| alpha | no | 0 | 1 | 0 | 0 |
+| beta | no | 0 | 2 | 0 | 0 |
+
+### Persona coverage
+
+| Persona | Acme actor | alpha | beta | gamma |
+| --- | --- | --- | --- | --- |
+| buyer | none | claimed, 1 review | 2 reviews | — |
+| partner | partner | — | — | — |
+"
+`;

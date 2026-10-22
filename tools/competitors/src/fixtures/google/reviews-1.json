@@ -1,0 +1,58 @@
+{
+  "place_info": {
+    "title": "Example Co",
+    "rating": 5,
+    "reviews": 5,
+    "type": "Software company"
+  },
+  "reviews": [
+    {
+      "position": 1,
+      "link": "https://maps.example/reviews/example-review-1",
+      "rating": 5,
+      "date": "11 months ago",
+      "iso_date": "2025-10-12T19:09:56Z",
+      "iso_date_of_last_edit": "2025-10-12T19:09:56Z",
+      "source": "Google",
+      "review_id": "example-review-1",
+      "snippet": "Service and attention among the best I have met. Excellent product. Highly recommended",
+      "extracted_snippet": {
+        "original": "Service and attention among the best I have met. Excellent product. Highly recommended"
+      },
+      "likes": 0
+    },
+    {
+      "position": 2,
+      "link": "https://maps.example/reviews/example-review-2",
+      "rating": 5,
+      "date": "Edited: 11 months ago",
+      "iso_date": "2024-09-11T20:32:43Z",
+      "iso_date_of_last_edit": "2025-10-01T07:59:45Z",
+      "source": "Google",
+      "review_id": "example-review-2",
+      "snippet": "Clever idea! They made the whole thing easy for everyone who joined.",
+      "extracted_snippet": {
+        "original": "Clever idea! They made the whole thing easy for everyone who joined."
+      },
+      "likes": 0
+    },
+    {
+      "position": 3,
+      "link": "https://maps.example/reviews/example-review-3",
+      "rating": 5,
+      "date": "a year ago",
+      "iso_date": "2025-08-31T10:39:47Z",
+      "iso_date_of_last_edit": "2025-08-31T10:39:47Z",
+      "source": "Google",
+      "review_id": "example-review-3",
+      "snippet": "Quick to set up and simple to use. Recommended.",
+      "extracted_snippet": {
+        "original": "Quick to set up and simple to use. Recommended."
+      },
+      "likes": 0
+    }
+  ],
+  "serpapi_pagination": {
+    "next_page_token": "TOKEN-2"
+  }
+}

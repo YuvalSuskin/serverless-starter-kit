@@ -1,0 +1,34 @@
+{
+  "reviews": [
+    {
+      "position": 1,
+      "link": "https://maps.example/reviews/example-review-4",
+      "rating": 5,
+      "date": "a year ago",
+      "iso_date": "2024-11-27T09:06:31Z",
+      "iso_date_of_last_edit": "2024-11-27T09:06:31Z",
+      "source": "Google",
+      "review_id": "example-review-4",
+      "snippet": "Great tool!\nEveryone had what they needed within a short time\nHighly recommended!",
+      "extracted_snippet": {
+        "original": "Great tool!\nEveryone had what they needed within a short time\nHighly recommended!"
+      },
+      "likes": 0
+    },
+    {
+      "position": 2,
+      "link": "https://maps.example/reviews/example-review-5",
+      "rating": 5,
+      "date": "a year ago",
+      "iso_date": "2024-11-25T16:00:43Z",
+      "iso_date_of_last_edit": "2024-11-25T16:00:43Z",
+      "source": "Google",
+      "review_id": "example-review-5",
+      "snippet": "I used it for a family get-together, the first time it all just worked, very nice.",
+      "extracted_snippet": {
+        "original": "I used it for a family get-together, the first time it all just worked, very nice."
+      },
+      "likes": 0
+    }
+  ]
+}

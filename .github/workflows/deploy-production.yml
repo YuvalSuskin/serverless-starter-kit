@@ -1,0 +1,144 @@
+name: deploy-production
+
+# Production is released from one commit the owner names (CI decisions CI19,
+# decided by the owner 2026-10-20).
+# The owner starts it on main with the commit's sha: any commit on main's
+# history that carries the local proof (CI17), so main's head or an older
+# commit (a rollback). Two runs:
+#   1. Run workflow, apply off: the release check, then sst diff and the diff
+#      guard for production, shown in the run's summary. Nothing changes.
+#   2. Having read that plan, Run workflow again with the same sha and apply
+#      on: refused unless the owner's passed plan of that commit (with the
+#      same first_deploy) exists and nothing was released since, and never on
+#      a re-run; then the same diff and guard, sst deploy and the smoke test.
+# The release check (tools/local-check/src/release.ts) runs from main's
+# checkout; only then is the release checked out, and its own setup, deploy
+# steps and smoke test run as it was proven. Both runs act as the
+# github-deploy-production role in acme-prod, which trusts this workflow
+# file on main (its OIDC subject names it: infra/aws/README.md, "GitHub deploy
+# role"); until that role exists a run fails at the credentials step and
+# nothing reaches AWS. Agents never start it (infra/CLAUDE.md). Runbook:
+# docs/runbooks/deployment.md, "The deploy pipeline".
+run-name: ${{ inputs.apply && 'Release' || 'Plan' }} ${{ inputs.sha }} to production${{ inputs.first_deploy && ' (first deploy)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: The commit to release, from main's history (its sha; at least 7 characters).
+        type: string
+        required: true
+      apply:
+        description: Deploy. Leave off for the first run, which only plans for you to read.
+        type: boolean
+        default: false
+      first_deploy:
+        description: Only for production's very first deploy, when its table, buckets and user pool are created.
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Only the owner, only from main's workflow file; anyone else's run is skipped.
+    # The owner is the repository's owner; for an organization-owned repository,
+    # write the owner's login in place of github.repository_owner (here and in
+    # the release check's OWNER below).
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 60 # a first deploy (new distribution, certificate) can be long
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # the production role trusts this workflow's token on main only
+      statuses: read # the release check reads the local/check-full proof
+      pull-requests: read # ... and the pull request that made a squash commit
+      actions: read # ... and this workflow's earlier runs (the plan)
+    steps:
+      # main as it is now, with its history: the release check is main's.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Skeleton: the role comes from deploy/accounts.json, which `/bootstrap
+      # accounts` fills. Empty, this step says so and every step after it is
+      # skipped, so the job ends green with nothing deployed.
+      - id: accounts
+        name: Accounts
+        env:
+          STAGE: production
+        run: |
+          account=$(jq -r --arg stage "$STAGE" '.stages[$stage].account // empty' deploy/accounts.json)
+          region=$(jq -r '.region // empty' deploy/accounts.json)
+          if [ -z "$account" ] || [ -z "$region" ]; then
+            echo "::notice::deploy/accounts.json has no account or region for $STAGE: nothing is deployed until /bootstrap accounts fills it in."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The skeleton's demo routes are unauthenticated: no deploy until
+          # bootstrap step 6 replaces them. The template ships the state file and
+          # Finishing keeps it; no file means a project deleted .bootstrap/ after.
+          state=.bootstrap/state.json
+          if [ -f "$state" ] && [ "$(jq -r '.steps["6-replace-skeleton"].status // empty' "$state")" != "done" ]; then
+            echo "::error::The template's skeleton is still in place, and its demo routes are unauthenticated: nothing is deployed until /bootstrap replace-skeleton (step 6) replaces it."
+            exit 1
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          echo "role=arn:aws:iam::${account}:role/github-deploy-$STAGE" >> "$GITHUB_OUTPUT"
+          echo "region=$region" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          node-version-file: .nvmrc
+      - name: Release check
+        id: release
+        if: steps.accounts.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA_INPUT: ${{ inputs.sha }}
+          APPLY: ${{ inputs.apply }}
+          FIRST_DEPLOY: ${{ inputs.first_deploy }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW: deploy-production.yml
+        run: node tools/local-check/src/cli.ts release-check
+      # The release itself, exactly that commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          persist-credentials: false
+      - name: The release is checked out
+        if: steps.accounts.outputs.configured == 'true'
+        env:
+          RELEASE: ${{ steps.release.outputs.sha }}
+        run: |
+          head=$(git rev-parse HEAD)
+          if [ -z "$RELEASE" ] || [ "$head" != "$RELEASE" ]; then
+            echo "::error::Checked out $head, not the release ${RELEASE:-(none)}."
+            exit 1
+          fi
+      - uses: ./.github/actions/setup
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          browsers: ""
+      - uses: ./.github/actions/deploy-stage
+        if: steps.accounts.outputs.configured == 'true'
+        with:
+          stage: production
+          role: ${{ steps.accounts.outputs.role }}
+          region: ${{ steps.accounts.outputs.region }}
+          apply: ${{ inputs.apply }}
+          first-deploy: ${{ inputs.first_deploy }}
+          session-seconds: "7200"

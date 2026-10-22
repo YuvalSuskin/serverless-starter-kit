@@ -1,0 +1,44 @@
+{
+  "name": "@acme/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/entries/dev/server.ts",
+    "serve": "tsx src/entries/dev/server.ts",
+    "build": "tsx scripts/build.ts",
+    "format": "prettier --check . --ignore-path ../.prettierignore",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "knip": "knip",
+    "test": "vitest run --project unit",
+    "test:contract": "vitest run --project contract",
+    "test:bundle": "vitest run --project bundle",
+    "fix": "eslint . --fix && prettier --write . --ignore-path ../.prettierignore",
+    "check": "turbo run format lint typecheck knip test test:contract test:bundle"
+  },
+  "dependencies": {
+    "@aws-lambda-powertools/logger": "2.35.0",
+    "@aws-sdk/client-dynamodb": "3.1138.0",
+    "@aws-sdk/client-sesv2": "3.1138.0",
+    "@aws-sdk/lib-dynamodb": "3.1138.0",
+    "@acme/contracts": "workspace:*",
+    "hono": "4.13.8",
+    "uuid": "14.0.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@hono/node-server": "2.1.1",
+    "@acme/config": "workspace:*",
+    "@types/aws-lambda": "8.10.163",
+    "@types/node": "24.13.6",
+    "esbuild": "0.28.2",
+    "eslint": "10.11.0",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-boundaries": "7.2.0",
+    "knip": "6.38.0",
+    "testcontainers": "12.1.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

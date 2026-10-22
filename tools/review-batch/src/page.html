@@ -1,0 +1,581 @@
+<title>{{TITLE}}</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --ink: #18202c;
+    --muted: #5e6878;
+    --line: #dce1e8;
+    --line2: #edf0f4;
+    --chip: #eef1f5;
+    --accent: #2e6bd6;
+    --good: #1f7a4c;
+    --bad: #b3261e;
+    --warn: #9a5b00;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #10141b;
+      --surface: #171c25;
+      --ink: #e5e9f0;
+      --muted: #8d97a8;
+      --line: #2a313d;
+      --line2: #20262f;
+      --chip: #222935;
+      --accent: #5a8feb;
+      --good: #4cb784;
+      --bad: #ef6259;
+      --warn: #e0a24a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #10141b;
+    --surface: #171c25;
+    --ink: #e5e9f0;
+    --muted: #8d97a8;
+    --line: #2a313d;
+    --line2: #20262f;
+    --chip: #222935;
+    --accent: #5a8feb;
+    --good: #4cb784;
+    --bad: #ef6259;
+    --warn: #e0a24a;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-inline: 16px;
+    padding-block: 0 48px;
+  }
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 2;
+    background: var(--bg);
+    padding-block: 14px 10px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+    font-weight: 600;
+    flex: 1 1 auto;
+    text-wrap: balance;
+  }
+  .count {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  button {
+    font: inherit;
+    cursor: pointer;
+  }
+  .submit {
+    border: 0;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--surface);
+    padding: 8px 16px;
+    font-weight: 600;
+  }
+  .submit:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .submit.confirming {
+    background: var(--accent);
+  }
+  .notice {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--chip);
+    font-size: 14px;
+  }
+  .intro {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0;
+    max-width: 75ch;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  @media (min-width: 1000px) {
+    .cards {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    min-width: 0;
+  }
+  .card-head {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    align-items: baseline;
+  }
+  .card-head::-webkit-details-marker {
+    display: none;
+  }
+  .kind {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--chip);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+  .title {
+    font-weight: 600;
+  }
+  .state {
+    font-size: 12.5px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .state[data-state="done"] {
+    color: var(--good);
+  }
+  .state[data-state="note"] {
+    color: var(--warn);
+  }
+  .unblocks {
+    grid-column: 2 / -1;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .card-body {
+    padding: 0 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid var(--line2);
+  }
+  .bead {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin: 10px 0 0;
+  }
+  .blocked {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    font-size: 14px;
+  }
+  .pitch h3 {
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    margin: 12px 0 4px;
+  }
+  .pitch p,
+  .pitch ul,
+  .pitch ol {
+    margin: 0;
+  }
+  .pitch ul,
+  .pitch ol {
+    padding-inline-start: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .inout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .inout h4 {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .calls {
+    gap: 10px !important;
+  }
+  .call p {
+    margin: 0;
+  }
+  .rec {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .rec b {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  label.override {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  input[type="text"],
+  textarea {
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    width: 100%;
+  }
+  textarea {
+    min-height: 64px;
+    resize: vertical;
+  }
+  .full > summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--accent);
+  }
+  .draft {
+    border-inline-start: 2px solid var(--line);
+    padding-inline-start: 12px;
+    margin-top: 8px;
+    font-size: 14px;
+    overflow-x: auto;
+  }
+  .draft :is(p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote) {
+    unicode-bidi: plaintext;
+    text-align: start;
+  }
+  .draft table {
+    border-collapse: collapse;
+  }
+  .draft td,
+  .draft th {
+    border: 1px solid var(--line);
+    padding: 4px 6px;
+    vertical-align: top;
+  }
+  .answer {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .answer legend {
+    font-weight: 600;
+    padding: 0 4px;
+  }
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .choices label {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .choices input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .choices label:has(input:checked) {
+    background: var(--ink);
+    color: var(--surface);
+    border-color: var(--ink);
+  }
+  .choices label:has(input:focus-visible),
+  button:focus-visible,
+  input[type="text"]:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .need-note {
+    margin: 0;
+    color: var(--warn);
+    font-size: 13px;
+  }
+  .locked .answer,
+  .locked label.override {
+    opacity: 0.7;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      scroll-behavior: auto !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <h1>{{HEADING}}</h1>
+    <span class="count" id="count" aria-live="polite"></span>
+    <button type="button" class="submit" id="submit" disabled>Submit batch</button>
+  </div>
+  <p class="notice" id="notice" hidden></p>
+  <p class="intro">
+    Each card opens with a short pitch. Answer every card: approve it, approve it with a note,
+    reject it with a note, or leave it for later. Each call starts at its recommendation; write an
+    answer only where you disagree. Your answers are saved as you go. Nothing is applied until you
+    submit the batch.
+  </p>
+  <div class="cards" id="cards">{{CARDS}}</div>
+</div>
+
+<script type="application/json" id="batch-data">
+  "__BATCH_DATA__"
+</script>
+<script type="module">
+  /* __PAGE_LOGIC__ */
+
+  const data = JSON.parse(document.getElementById("batch-data").textContent);
+  const cardEls = [...document.querySelectorAll(".card")];
+  const byKey = new Map(cardEls.map((el) => [el.dataset.key, el]));
+  let answers = {};
+  // Keys whose on-screen answer is not yet confirmed by the store.
+  const unsaved = new Set();
+  const writes = new Map();
+  const timers = new Map();
+  let db = null;
+  let status = "open";
+  let confirmTimer = null;
+
+  const $count = document.getElementById("count");
+  const $submit = document.getElementById("submit");
+  const $notice = document.getElementById("notice");
+
+  function notice(text) {
+    $notice.textContent = text;
+    $notice.hidden = !text;
+  }
+
+  // On a computer every card is open side by side; on a phone one at a time.
+  function layout() {
+    const wide = window.matchMedia("(min-width: 1000px)").matches;
+    cardEls.forEach((el, i) => {
+      if (wide) {
+        el.removeAttribute("name");
+        el.open = true;
+      } else {
+        el.setAttribute("name", "cards");
+        el.open = i === 0;
+      }
+    });
+  }
+
+  function readCard(el) {
+    const choice = el.querySelector("input[type=radio]:checked")?.value;
+    if (!choice) return undefined;
+    const calls = {};
+    el.querySelectorAll("[data-call-input]").forEach((input) => {
+      if (input.value.trim()) calls[input.dataset.callInput] = input.value.trim();
+    });
+    return { choice, note: el.querySelector("[data-note]").value, calls };
+  }
+
+  function paintCard(el, answer) {
+    if (unsaved.has(el.dataset.key) || el.contains(document.activeElement)) return;
+    el.querySelectorAll("input[type=radio]").forEach((radio) => {
+      radio.checked = radio.value === answer?.choice;
+    });
+    el.querySelector("[data-note]").value = answer?.note ?? "";
+    el.querySelectorAll("[data-call-input]").forEach((input) => {
+      input.value = answer?.calls?.[input.dataset.callInput] ?? "";
+    });
+  }
+
+  function isLocked() {
+    return status !== "open";
+  }
+
+  function refresh() {
+    const locked = isLocked();
+    const { answered, total } = progress(data.cards, answers);
+    $count.textContent = `${answered} of ${total} answered${unsaved.size > 0 ? ", saving" : ""}`;
+    $submit.hidden = db === null || locked;
+    $submit.disabled = !readyToSubmit(data.cards, answers, unsaved.size);
+    for (const card of data.cards) {
+      const key = answerKey(card);
+      const el = byKey.get(key);
+      const answer = answers[key];
+      const needsNote =
+        answer &&
+        (answer.choice === "approve-note" || answer.choice === "reject") &&
+        !(answer.note ?? "").trim();
+      const $state = el.querySelector(".state");
+      $state.dataset.state = !answer ? "" : needsNote ? "note" : "done";
+      $state.textContent = !answer ? "Not answered" : needsNote ? "Needs a note" : "Answered";
+      el.querySelector(".need-note").hidden = !needsNote;
+      el.classList.toggle("locked", locked);
+      el.querySelectorAll("input, textarea").forEach((input) => {
+        input.disabled = locked || db === null;
+      });
+    }
+  }
+
+  // Save what the card shows now. One write at a time per document; the key
+  // stays unsaved until the store confirms the latest write, and a failure
+  // rejects, so a batch is never submitted with an unsaved answer.
+  function save(key) {
+    const answer = readCard(byKey.get(key));
+    if (!db || !answer) return Promise.resolve();
+    const previous = writes.get(key) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(() => db.doc(`answers/${key}`).set(answer))
+      .then(() => {
+        if (writes.get(key) === next) {
+          unsaved.delete(key);
+          refresh();
+        }
+      });
+    writes.set(key, next);
+    next.catch((error) => {
+      notice(`An answer was not saved (${error?.code ?? "error"}). Change it again to retry.`);
+      refresh();
+    });
+    return next;
+  }
+
+  function scheduleSave(el) {
+    const key = el.dataset.key;
+    unsaved.add(key);
+    answers = { ...answers, [key]: readCard(el) };
+    refresh();
+    clearTimeout(timers.get(key));
+    timers.set(
+      key,
+      setTimeout(() => {
+        timers.delete(key);
+        save(key);
+      }, 500),
+    );
+  }
+
+  // Save every change still waiting on its timer, and wait for all writes.
+  function flushAll() {
+    for (const [key, timer] of timers) {
+      clearTimeout(timer);
+      timers.delete(key);
+      save(key);
+    }
+    return Promise.all([...writes.values()]);
+  }
+
+  document.getElementById("cards").addEventListener("input", (event) => {
+    const el = event.target.closest(".card");
+    if (el && !isLocked() && db) scheduleSave(el);
+  });
+
+  $submit.addEventListener("click", async () => {
+    if (!db || isLocked() || !canSubmit(data.cards, answers)) return;
+    if (!$submit.classList.contains("confirming")) {
+      $submit.classList.add("confirming");
+      $submit.textContent = `Submit ${data.cards.length} answers?`;
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(() => {
+        $submit.classList.remove("confirming");
+        $submit.textContent = "Submit batch";
+      }, 5000);
+      return;
+    }
+    clearTimeout(confirmTimer);
+    $submit.classList.remove("confirming");
+    $submit.textContent = "Submit batch";
+    $submit.disabled = true;
+    try {
+      await flushAll();
+      if (!readyToSubmit(data.cards, answers, unsaved.size)) {
+        notice("Some answers are not saved yet. Check them, then submit again.");
+        refresh();
+        return;
+      }
+      await db
+        .doc("batch/state")
+        .set({ status: "submitted", round: data.round, submittedAt: new Date().toISOString() });
+    } catch (error) {
+      notice(`The batch was not submitted (${error?.code ?? "error"}). Try again.`);
+      refresh();
+    }
+  });
+
+  layout();
+  window.matchMedia("(min-width: 1000px)").addEventListener("change", layout);
+  refresh();
+
+  const claude = window.claude;
+  db = claude ? await claude.use("db") : null;
+  if (!db) {
+    notice(
+      "Answers can't be saved in this view. Open the page on claude.ai, signed in, to answer.",
+    );
+    refresh();
+  } else {
+    db.collection("answers").onSnapshot(
+      (snap) => {
+        const stored = {};
+        for (const doc of snap.docs) stored[doc.id] = doc.data();
+        answers = mergeStored(answers, stored, unsaved);
+        for (const card of data.cards)
+          paintCard(byKey.get(answerKey(card)), answers[answerKey(card)]);
+        refresh();
+      },
+      () => notice("Saved answers stopped loading. Reload the page."),
+    );
+    db.doc("batch/state").onSnapshot(
+      (snap) => {
+        status = pageStatus(snap.exists ? snap.data() : undefined, data.round);
+        if (status === "submitted")
+          notice("Submitted. Waiting for the batch lead to apply your answers.");
+        else if (status === "applied") notice("Applied. Thank you.");
+        else if (status === "stale") notice("A newer round of this batch exists. Reload the page.");
+        else notice("");
+        refresh();
+      },
+      () => notice("The batch's state stopped loading. Reload the page."),
+    );
+  }
+</script>

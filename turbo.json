@@ -1,0 +1,107 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "stream",
+  "globalPassThroughEnv": ["CI"],
+  "globalDependencies": [".nvmrc", "package.json", "pnpm-workspace.yaml", ".github/**"],
+  "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "typegen": {
+      "outputs": ["next-env.d.ts", ".next/types/**", ".next/dev/types/**"]
+    },
+    "//#format": {
+      "inputs": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+        ".prettierrc.json",
+        ".github/**"
+      ]
+    },
+    "format": {},
+    "lint": {
+      "dependsOn": ["transit", "typegen"]
+    },
+    "typecheck": {
+      "dependsOn": ["transit", "typegen"]
+    },
+    "knip": {
+      "dependsOn": ["transit", "typegen"]
+    },
+    "test": {
+      "dependsOn": ["transit"]
+    },
+    "@acme/backend#test": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/docs/**"]
+    },
+    "@acme/competitors#test": {
+      "dependsOn": ["transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/docs/competitors/**",
+        "$TURBO_ROOT$/docs/product/**"
+      ]
+    },
+    "@acme/bootstrap#test": {
+      "dependsOn": ["transit"],
+      "cache": false,
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/**/*.md",
+        "$TURBO_ROOT$/.claude/**",
+        "$TURBO_ROOT$/.bootstrap/**",
+        "$TURBO_ROOT$/.beads/seed-memories.json",
+        "$TURBO_ROOT$/.github/**",
+        "$TURBO_ROOT$/docs/**",
+        "$TURBO_ROOT$/infra/**",
+        "$TURBO_ROOT$/deploy/**",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.superpowers/**",
+        "!$TURBO_ROOT$/deploy/.sst/**"
+      ]
+    },
+    "@acme/sweep#test": {
+      "dependsOn": ["transit"],
+      "cache": false,
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/**/*.md",
+        "$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.superpowers/**"
+      ]
+    },
+    "test:contract": {
+      "dependsOn": ["transit"],
+      "passThroughEnv": ["DOCKER_HOST", "TESTCONTAINERS_*"]
+    },
+    "build": {
+      "dependsOn": ["transit"],
+      "env": ["SITE_URL"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "@acme/backend#test:bundle": {
+      "dependsOn": ["transit", "@acme/backend#build"]
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["E2E_PORT", "E2E_API_PORT"]
+    },
+    "fix": {
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["PORT", "DEV_API_PORT", "DEV_SITE_URL", "NODE_OPTIONS", "ACME_OFFLINE_LOG"]
+    },
+    "storybook": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

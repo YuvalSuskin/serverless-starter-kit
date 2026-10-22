@@ -1,0 +1,28 @@
+- id: contributions
+  name: Shared list
+  type: feature
+  stage: content
+  glossary: shared-list
+  aliases: [shared list, joint list]
+  withdrawn: null
+- id: auto-tag
+  name: Auto tag
+  type: feature
+  stage: content
+  glossary: null
+  aliases: [semantic search]
+  withdrawn: null
+- id: old-search
+  name: Keyword search
+  type: feature
+  stage: content
+  glossary: null
+  aliases: []
+  withdrawn: { date: 2026-09-29, reason: merged into auto tag, replaced_by: auto-tag }
+- id: price
+  name: Price
+  type: aspect
+  stage: aspect
+  glossary: null
+  aliases: [cost]
+  withdrawn: null

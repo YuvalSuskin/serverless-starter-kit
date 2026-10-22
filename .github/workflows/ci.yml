@@ -1,0 +1,80 @@
+name: ci
+
+# The local proof is the gate (CI decisions CI17). `pnpm check:full` runs every
+# check on the owner's Mac and posts a commit status, `local/check-full`, on the
+# commit that passed (tools/local-check). GitHub runs no test: this workflow is
+# one job, `proof`, which takes seconds and passes only when that status is on
+# the PR's head, was made on the repo's Node major (CI16), and covered e2e when
+# the change affects the frontend (CI15's reading of the proof). main's branch
+# rule requires both `local/check-full` and `proof` before a merge.
+#
+# No paths filter: a docs-only PR needs its proof too (check:full is near
+# instant for one, "e2e none"). A draft runs nothing (CI10);
+# `pnpm check:full --ready` posts the proof, then marks the PR ready, which
+# runs this. A push to main runs nothing: dev is deployed from the Mac after
+# merges, and deploy-dev.yml is the manual fallback (runbook, "The deploy
+# pipeline").
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read # local-proof.sh reads the local/check-full status
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # --affected needs the history back to the base
+      # The status on the exact head commit: a commit names its tree, so a
+      # proof cannot be stale. Posting it re-runs a run that failed here
+      # (tools/local-check), so this waits only for the pre-push hook's
+      # background post, which lands seconds after the push. Dependabot's PRs
+      # have no machine that pushed them: no wait (the orchestrator runs
+      # check:full on their head; tools/local-check/CLAUDE.md).
+      - name: Local check proof
+        id: proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          WAIT_SECONDS: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && '0' || '45' }}
+        run: .github/scripts/local-proof.sh
+      # Only the root's dependencies (turbo), from the lockfile.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter acme
+      # What the change affects, from turbo's graph (B9: no hand-kept path
+      # lists). The checkout is GitHub's merge of the PR into main; its first
+      # parent is the main it was built on, so this is the PR's own change,
+      # as check:full measures it from its merge base. (The event's base.sha
+      # can be older than that main, and would count main's changes too.) A
+      # failed turbo fails the job (pipefail).
+      - name: What the change affects
+        id: affected
+        run: |
+          set -o pipefail
+          export TURBO_SCM_BASE=$(git rev-parse HEAD^1)
+          names=$(pnpm exec turbo ls --affected --output=json | jq -ce '[.packages.items[].name]')
+          echo "affected: $names"
+          echo "frontend=$(jq 'index("@acme/frontend") != null' <<<"$names")" >> "$GITHUB_OUTPUT"
+      # Node built-ins only (tools/local-check/src/e2e-matrix.ts).
+      - name: Proof covers the change
+        env:
+          PROOF_DESCRIPTION: ${{ steps.proof.outputs.description }}
+          FRONTEND_AFFECTED: ${{ steps.affected.outputs.frontend }}
+        run: node tools/local-check/src/cli.ts proof-scope

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head><meta charset="utf-8"><title>Structure</title></head>
+<body>
+<header><h1>Plans</h1></header>
+<a href="#" style="display:flex;gap:8px"><span>Basic plan</span><span>$350</span></a>
+<div><button>Try free</button><button>Book a demo</button></div>
+<table>
+  <tr><th>Feature</th><th>Basic</th><th>Pro</th></tr>
+  <tr><td>Backup</td><td><svg width="8" height="8"><circle r="4"/></svg></td><td>✓</td></tr>
+</table>
+<ul><li><p>Private space</p></li><li>Live view</li></ul>
+<div style="display:none">Old price $999</div>
+<p hidden>Ended offer</p>
+<h3><button aria-expanded="false" aria-controls="faq-answer-0">How long are files kept?</button></h3>
+<div id="faq-answer-0" class="answer" style="display:none"><p>Six months, with an option to extend.</p></div>
+<details><summary>Is there a limit on files?</summary><p>There is no limit on files.</p></details>
+<button aria-haspopup="listbox" aria-expanded="false">Français</button><ul role="listbox" style="display:none"><li>English</li></ul>
+<p>Line<br><br>After a blank line</p>
+<div id="consent">We use cookies <button id="accept">OK</button></div>
+<script>document.getElementById("accept").addEventListener("click", () => document.body.insertAdjacentHTML("beforeend", "<p>Cookies: accepted</p>"));</script>
+<footer>All rights reserved</footer>
+</body>
+</html>

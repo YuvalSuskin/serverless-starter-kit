@@ -1,0 +1,13 @@
+- ref: google-694cfcb1eeee0d9b184fad86
+  persona: buyer
+  summary_en: "Too expensive; auto tag only partly worked."
+  mentions:
+    - { feature: price, sentiment: negative, kind: pain }
+    - { feature: auto-tag, sentiment: mixed, kind: pain }
+  tagged: 2026-09-29
+- ref: site-bbbbbbbbbb
+  persona: buyer
+  summary_en: "Shared list costs $400."
+  mentions:
+    - { feature: contributions, sentiment: neutral, kind: claim }
+  tagged: 2026-09-29

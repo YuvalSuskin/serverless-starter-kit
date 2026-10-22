@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ test -e \"$CLAUDE_PROJECT_DIR/.acme-template\" && ! test -e \"$CLAUDE_PROJECT_DIR/.beads/embeddeddolt\" && ! test -e \"$CLAUDE_PROJECT_DIR/.beads/dolt\"; } || bd prime --hook-json"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(bd update *)",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/tools/preview/src/hooks/bead-branch.ts"],
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "if": "Bash(gh pr create *)",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/tools/preview/src/hooks/bead-branch.ts"],
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "elements-of-style@elements-of-style-dev": true
+  },
+  "extraKnownMarketplaces": {
+    "elements-of-style-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/the-elements-of-style"
+      }
+    }
+  }
+}

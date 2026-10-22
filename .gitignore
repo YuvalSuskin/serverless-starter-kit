@@ -1,0 +1,57 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local secrets and environment (any package). Commit only examples.
+.env
+.env.*
+!.env.example
+
+# Scratch
+*.tmp
+scratch/
+# Agent working files: plan ledgers, review batches, sweep runs
+.superpowers/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+# The passive JSONL export of the Dolt tracker (Dolt is the source of truth)
+.beads/issues.jsonl
+.beads/proxieddb/
+*.gate.lock*
+
+# Node / Next / test output
+node_modules/
+.next/
+storybook-static/
+coverage/
+test-results/
+playwright-report/
+__screenshots__/
+.vitest-attachments/
+.eslintcache
+*.tsbuildinfo
+next-env.d.ts
+
+# Turborepo
+.turbo/
+
+# SST (deploy/): the platform code it downloads; OpenNext's build output
+.sst/
+.open-next/
+sst-env.d.ts
+# Each Lambda's code folder, laid out by deploy/scripts/package.ts
+deploy/.build/
+
+# Local env overrides (Next's .env*.local): never committed.
+.env*.local
+
+# The Playwright MCP browser writes snapshots and logs here; never committed.
+.playwright-mcp/

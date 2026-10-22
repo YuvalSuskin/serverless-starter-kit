@@ -1,0 +1,12 @@
+- id: site-aaaaaaaaaa
+  url: https://alpha.example/pricing
+  kind: price
+  text: $350 per shared list
+  fetched: 2026-09-01
+  superseded: { date: 2026-09-29, by: site-bbbbbbbbbb }
+- id: site-bbbbbbbbbb
+  url: https://alpha.example/pricing
+  kind: price
+  text: $400 per shared list
+  fetched: 2026-09-29
+  superseded: null

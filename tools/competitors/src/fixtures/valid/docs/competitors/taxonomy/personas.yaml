@@ -1,0 +1,10 @@
+- id: buyer
+  name: Buyer
+  actor: null
+  aliases: [client]
+  withdrawn: null
+- id: partner
+  name: Partner
+  actor: partner
+  aliases: [supplier]
+  withdrawn: null

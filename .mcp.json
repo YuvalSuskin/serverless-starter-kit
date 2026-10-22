@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "beads": {
+      "type": "stdio",
+      "command": "beads-mcp",
+      "args": [],
+      "env": {}
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@1.10.1",
+        "--isolated",
+        "--no-usage-statistics",
+        "--no-performance-crux"
+      ],
+      "env": {}
+    },
+    "shadcn": {
+      "type": "stdio",
+      "command": "sh",
+      "args": ["-c", "cd frontend && exec npx -y shadcn@4.21.5 mcp"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,159 @@
+#!/usr/bin/env sh
+# --- BEGIN BEADS INTEGRATION v1.3.0 ---
+# This section is managed by beads. Do not remove these markers.
+if command -v bd >/dev/null 2>&1; then
+  export BD_GIT_HOOK=1
+  _bd_timeout=${BEADS_HOOK_TIMEOUT:-300}
+  case "$_bd_timeout" in
+    *[!0-9]*|'') _bd_timeout_invalid=1 ;;
+    *[1-9]*) _bd_timeout_invalid=0 ;;
+    *) _bd_timeout_invalid=1 ;;
+  esac
+  if [ "$_bd_timeout_invalid" -eq 1 ]; then
+    echo >&2 "beads: invalid BEADS_HOOK_TIMEOUT; using 300 seconds"
+    _bd_timeout=300
+  fi
+  _bd_timeout_backend=none
+  _bd_timeout_command=
+  for _bd_timeout_candidate in timeout gtimeout; do
+    if command -v "$_bd_timeout_candidate" >/dev/null 2>&1; then
+      if _bd_timeout_version="$("$_bd_timeout_candidate" --version 2>/dev/null)"; then
+        case "$_bd_timeout_version" in
+          "timeout (GNU coreutils) "*) _bd_timeout_command=$_bd_timeout_candidate; break ;;
+        esac
+      fi
+    fi
+  done
+  if [ -n "$_bd_timeout_command" ]; then
+    _bd_timeout_backend=coreutils
+    if "$_bd_timeout_command" -- "$_bd_timeout" bd hooks run pre-push "$@"; then
+      _bd_exit=0
+    else
+      _bd_exit=$?
+    fi
+  elif command -v perl >/dev/null 2>&1; then
+    _bd_timeout_backend=perl
+    if perl -e 'alarm shift; exec @ARGV' -- "$_bd_timeout" bd hooks run pre-push "$@"; then
+      _bd_exit=0
+    else
+      _bd_exit=$?
+    fi
+  else
+    echo >&2 "beads: hook 'pre-push' running without timeout; install coreutils or perl to enable BEADS_HOOK_TIMEOUT"
+    if bd hooks run pre-push "$@"; then
+      _bd_exit=0
+    else
+      _bd_exit=$?
+    fi
+  fi
+  if { [ "$_bd_timeout_backend" = coreutils ] && [ "$_bd_exit" -eq 124 ]; } || { [ "$_bd_timeout_backend" = perl ] && [ "$_bd_exit" -eq 142 ]; }; then
+    echo >&2 "beads: hook 'pre-push' timed out after ${_bd_timeout}s — continuing without beads"
+    _bd_exit=0
+  fi
+  if [ "$_bd_exit" -eq 3 ]; then
+    echo >&2 "beads: database not initialized — skipping hook 'pre-push'"
+    _bd_exit=0
+  fi
+  if [ "$_bd_exit" -ne 0 ]; then exit "$_bd_exit"; fi
+fi
+# --- END BEADS INTEGRATION v1.3.0 ---
+
+# --- BEGIN ACME PRE-PUSH CHECKS ---
+# Outside the beads markers, like the sync below, so bd upgrades keep it.
+#
+# CI's checks, run here before a push spends runner minutes on them
+# (docs/decisions/2026-10-06-ci-decisions.md, CI1, CI2, CI9-CI12):
+# `pnpm check:push`, which is format, lint, types, knip and unit tests for the
+# packages this branch changes against origin/main, then the sweep lint; on a
+# branch whose PR is ready for review, `pnpm check:full` too (contract,
+# bundle and e2e tests), whose proof CI waits for. Turbo's cache replays a
+# task whose inputs have not changed, so a push right after `pnpm check`
+# takes seconds.
+#
+# Every worktree runs THIS copy of the hook (core.hooksPath is the main
+# checkout's .beads/hooks), which changes only when the main checkout pulls.
+# So it only calls `pnpm check:push`; what that runs is
+# tools/local-check, which ships with each branch.
+#
+# It checks the working tree, so it checks a push only of the branch that is
+# checked out; pushing a deletion, a tag or refs/dolt is not checked. Where
+# there is nothing to check with (no turbo.json, as on the pr-screenshots
+# orphan branch; no node_modules) it says so and lets the push go.
+#
+# Escape hatch, for an emergency (CI still checks everything):
+#   ACME_SKIP_CHECKS=1 git push
+# (`git push --no-verify` skips every hook, the beads sync too.)
+if [ -z "$ACME_SKIP_CHECKS" ] && [ -z "$ACME_SYNCING" ]; then
+  _k_root=$(git rev-parse --show-toplevel)
+  _k_head=$(git rev-parse HEAD)
+  _k_check=0
+  _k_refs=0
+  # git writes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+  while read -r _k_lref _k_lsha _k_rref _k_rsha; do
+    _k_refs=$((_k_refs + 1))
+    case "$_k_rref" in refs/heads/*) ;; *) continue ;; esac
+    case "$_k_lsha" in *[!0]*) ;; *) continue ;; esac # all zeros: a deletion
+    if [ "$_k_lsha" = "$_k_head" ]; then
+      _k_check=1
+    else
+      echo >&2 "pre-push: $_k_lref is not checked out here, so it is not checked (CI will)."
+    fi
+  done
+  if [ "$_k_refs" -eq 0 ]; then _k_check=1; fi # no ref list: check what is checked out
+  if [ "$_k_check" -eq 1 ] && [ -f "$_k_root/turbo.json" ]; then
+    if [ ! -d "$_k_root/node_modules" ]; then
+      echo >&2 "pre-push: no node_modules, so nothing was checked. Run pnpm install."
+    else
+      if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+        echo >&2 "pre-push: uncommitted changes are checked too, though they are not pushed."
+      fi
+      echo "pre-push: pnpm check:push (CI's checks of what changed, before CI runs them)..."
+      echo "  in an emergency: ACME_SKIP_CHECKS=1 git push"
+      _k_base=$(git merge-base HEAD origin/main 2>/dev/null || true)
+      if (
+        cd "$_k_root" || exit 1
+        if [ -n "$_k_base" ]; then export TURBO_SCM_BASE="$_k_base"; fi
+        pnpm run --silent check:push
+      ); then
+        :
+      else
+        echo >&2 ""
+        echo >&2 "pre-push: CHECKS FAILED -- push aborted, before CI spent minutes on it."
+        echo >&2 "  Fix it: pnpm fix (formatting, lint), then pnpm check:push."
+        echo >&2 "  Emergency only: ACME_SKIP_CHECKS=1 git push"
+        exit 1
+      fi
+    fi
+  fi
+fi
+# --- END ACME PRE-PUSH CHECKS ---
+
+# --- BEGIN ACME SYNC ENFORCEMENT ---
+# Kept OUTSIDE the beads markers on purpose: bd hooks install rewrites only the
+# marked section and preserves everything else, so this survives bd upgrades.
+#
+# Why this exists: beads' own pre-push hook is a no-op for syncing. Pushing code
+# does NOT push issues -- refs/heads/* and refs/dolt/* are independent. Without
+# this, your issues silently stay on your machine while your code ships, and
+# nothing anywhere reports a problem.
+#
+# Escape hatch, for offline work or a broken remote:
+#   BEADS_SKIP_SYNC=1 git push
+if [ -z "$BEADS_SKIP_SYNC" ] && [ -z "$ACME_SYNCING" ] && command -v bd >/dev/null 2>&1; then
+  export ACME_SYNCING=1          # belt and braces against re-entry
+  echo "beads: syncing issues before push..."
+  if bd sync; then
+    :
+  else
+    _bd_sync_exit=$?
+    echo >&2 ""
+    echo >&2 "beads: SYNC FAILED (exit $_bd_sync_exit) -- push aborted."
+    echo >&2 "  Your code did NOT go out, on purpose: shipping code whose issues"
+    echo >&2 "  stayed behind is how a shared tracker quietly goes wrong."
+    echo >&2 ""
+    echo >&2 "  Resolve, then push again:   bd sync"
+    echo >&2 "  Offline and want it anyway: BEADS_SKIP_SYNC=1 git push"
+    exit "$_bd_sync_exit"
+  fi
+fi
+# --- END ACME SYNC ENFORCEMENT ---

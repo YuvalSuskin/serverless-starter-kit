@@ -1,0 +1,23 @@
+{
+  "name": "@acme/local-check",
+  "private": true,
+  "type": "module",
+  "description": "pnpm check:push and pnpm check:full: CI's checks run on this machine first, and the proof GitHub reads (CI decisions CI9-CI12, docs/decisions/2026-10-06-ci-decisions.md). Node built-ins only; Node runs the TypeScript source directly.",
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.prettierignore",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "knip": "knip",
+    "test": "vitest run",
+    "fix": "eslint . --fix && prettier --write . --ignore-path ../../.prettierignore",
+    "check": "turbo run format lint typecheck knip test"
+  },
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "10.11.0",
+    "knip": "6.38.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

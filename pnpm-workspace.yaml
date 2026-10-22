@@ -1,0 +1,54 @@
+packages:
+  - design
+  - frontend
+  - backend
+  - deploy
+  - packages/*
+  - tools/*
+
+# pnpm blocks dependency install scripts by default. These two only fetch or
+# verify a platform-native binary; nothing else is allowed to run scripts.
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver
+
+# Install scripts we deliberately never run. ssh2 (via testcontainers) builds an
+# optional native crypto binding and falls back to JavaScript; cpu-features is
+# an optional native speed-up for it; protobufjs's only prints a notice.
+# msw's rewrites
+# frontend/public/mockServiceWorker.js: that file is committed, and
+# frontend/tests/msw-worker.test.ts fails when it falls behind msw.
+ignoredBuiltDependencies:
+  - cpu-features
+  - msw
+  - protobufjs
+  - ssh2
+
+# eslint-config-next 16.3 bundles these three plugins, whose declared peer
+# ranges stop at ESLint 9. They run on ESLint 10 (verified; the only real
+# incompatibility, Next's Babel parser, is routed around in eslint.config.mjs).
+# Scoped to exactly these plugins and ESLint 10: drop each line once the
+# plugin declares ESLint 10 support itself.
+peerDependencyRules:
+  allowedVersions:
+    eslint-plugin-import>eslint: "10"
+    eslint-plugin-react>eslint: "10"
+    eslint-plugin-jsx-a11y>eslint: "10"
+    # Storybook's tsconfig-paths resolver (via @storybook/nextjs-vite) declares
+    # typescript ^5; it only parses tsconfig files and runs on TypeScript 6.
+    tsconfck>typescript: "6"
+
+# Supply-chain delay: refuse package versions published less than a day ago.
+minimumReleaseAge: 1440
+
+# Transitive packages whose parents' ranges still allow a version with a
+# security advisory (Dependabot alerts, 2026-10). Each override holds a floor
+# only for the vulnerable versions; drop it once every parent asks for the
+# fixed version itself (check `pnpm why <name>`).
+overrides:
+  # eslint-plugin-boundaries > @boundaries/elements pins 4.7.9 exactly
+  # (GHSA-p8wg-vrv2-v86f, GHSA-8r5x-fm3f-whwj, GHSA-xw65-4hp5-5hc7).
+  "handlebars@<4.7.10": "4.7.10"
+  # postcss, @tailwindcss/node and @eslint/css-tree ask for ^1.2.1
+  # (GHSA-68fv-2mgg-jv7q).
+  "source-map-js@<1.2.2": "1.2.2"

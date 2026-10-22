@@ -1,0 +1,65 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Matches pnpm's minimumReleaseAge: never propose a version under a day old.
+    cooldown:
+      default-days: 1
+    # Each Dependabot PR runs the full CI (the lockfile touches every
+    # package), about 35 runner minutes, and was rebased, so re-run, whenever
+    # main changed the lockfile under it: 31 runs and 30% of CI's minutes in
+    # five days (CI decisions CI6). Fewer open at once, and no automatic
+    # rebase: whoever merges one comments "@dependabot rebase" first.
+    # Security updates are not held by this limit.
+    open-pull-requests-limit: 3
+    rebase-strategy: disabled
+    groups:
+      next-react:
+        patterns: [next, react, react-dom, "@types/react", "@types/react-dom", eslint-config-next]
+      storybook:
+        patterns: [storybook, "@storybook/*", eslint-plugin-storybook]
+      vitest:
+        patterns: [vitest, "@vitest/*"]
+      playwright:
+        patterns: [playwright, "@playwright/test"]
+      tailwind:
+        patterns:
+          [
+            tailwindcss,
+            "@tailwindcss/*",
+            prettier-plugin-tailwindcss,
+            eslint-plugin-better-tailwindcss,
+            tailwind-merge,
+          ]
+      eslint:
+        patterns: [eslint, typescript-eslint, "eslint-*", "@eslint-community/*"]
+      backend:
+        patterns: [hono, "@hono/*", zod, uuid, esbuild, tsx, "@types/aws-lambda"]
+      aws:
+        patterns: ["@aws-sdk/*", "@aws-lambda-powertools/*"]
+      tooling:
+        patterns: [turbo, knip, testcontainers, msw, swr, vitest-browser-react]
+    ignore:
+      # @storybook/addon-vitest supports Vitest ^3 || ^4 only.
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: "@vitest/*"
+        update-types: [version-update:semver-major]
+      # typescript-eslint supports typescript <6.1.0.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # @types/node tracks the Node 24 LTS runtime in .nvmrc.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    # The workflows, and the local actions they use (their actions are pinned
+    # by commit).
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,5 @@
+{
+  "extends": "@acme/config/tsconfig/node.json",
+  "include": ["**/*.ts", "**/*.mts"],
+  "exclude": ["node_modules"]
+}

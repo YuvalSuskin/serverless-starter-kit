@@ -1,0 +1,63 @@
+/* GENERATED FILE -- do not edit.
+   Source: design/tokens/tokens.json
+   Rebuild: python3 design/scripts/tokens/build_tokens.py
+
+   Acme design tokens v1.0.0. The font face is declared by the Fontsource
+   package that frontend/src/app/fonts.ts imports; this file only names
+   the stack.
+*/
+:root{
+  /* colour */
+  --grey-50:  #FAFAFA;
+  --grey-100: #F5F5F5;
+  --grey-200: #E5E5E5;
+  --grey-300: #D4D4D4;
+  --grey-500: #6E6E6E;
+  --grey-700: #404040;
+  --grey-900: #171717;
+  --brand:    #1D4ED8;
+
+  /* semantic */
+  --bg:    var(--grey-50);
+  --panel: #FFFFFF;
+  --text:  var(--grey-900);
+  --muted: var(--grey-700);
+  --line:  rgba(23,23,23,.14);
+  --soft:  rgba(23,23,23,.05);
+
+  /* state */
+  --ok-fg:    #1E6B47;
+  --ok-bg:    #DCF0E4;
+  --info-fg:  #2A5599;
+  --info-bg:  #E2EBF9;
+  --warn-fg:  #7A4D00;
+  --warn-bg:  #FFEFC7;
+  --err-fg:   #B42318;
+  --err-bg:   #FDE3E0;
+  --draft-fg: #525252;
+  --draft-bg: #E5E5E5;
+
+  /* type */
+  --font-ui: "Inter Variable", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+
+  /* type scale (steps by sqrt(2)) */
+  --size-050: 0.70625rem;
+  --size-075: 0.84375rem;
+  --size-100: 1rem;
+  --size-200: 1.4125rem;
+  --size-300: 2rem;
+  --size-400: 2.83125rem;
+  --size-500: 4rem;
+
+  /* radius */
+  --r-card:  12px;
+  --r-input: 8px;
+  --r-photo: 8px;
+  --r-pill:  999px;
+
+  /* motion */
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 250ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}

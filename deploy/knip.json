@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/*.ts"],
+  "project": ["*.ts", "src/**/*.ts", "scripts/**/*.ts"],
+  "ignoreBinaries": ["prettier", "turbo"],
+  "ignoreDependencies": ["@acme/backend", "@acme/frontend"],
+  "ignoreUnresolved": ["./index.mjs"]
+}

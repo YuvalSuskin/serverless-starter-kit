@@ -1,0 +1,73 @@
+{
+  "name": "@acme/frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "build:opennext": "open-next build",
+    "start": "next start",
+    "typegen": "next typegen",
+    "format": "prettier --check . --ignore-path ../.prettierignore",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "knip": "knip",
+    "test": "vitest run",
+    "fix": "next typegen && eslint . --fix && prettier --write . --ignore-path ../.prettierignore",
+    "check": "turbo run format lint typecheck knip test",
+    "e2e": "playwright test",
+    "storybook": "storybook dev --port 6006",
+    "storybook:build": "storybook build"
+  },
+  "dependencies": {
+    "@acme/contracts": "workspace:*",
+    "@acme/design": "workspace:*",
+    "@fontsource-variable/inter": "5.3.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.48.0",
+    "motion": "13.4.3",
+    "next": "16.3.8",
+    "radix-ui": "1.6.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "swr": "2.5.1",
+    "tailwind-merge": "3.7.0"
+  },
+  "devDependencies": {
+    "@acme/config": "workspace:*",
+    "@axe-core/playwright": "4.13.0",
+    "@opennextjs/aws": "4.1.6",
+    "@playwright/test": "1.63.0",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-vitest": "10.6.0",
+    "@storybook/nextjs-vite": "10.6.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.13.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitest/browser-playwright": "4.1.11",
+    "eslint": "10.11.0",
+    "eslint-config-next": "16.3.8",
+    "eslint-plugin-better-tailwindcss": "4.7.0",
+    "eslint-plugin-boundaries": "7.2.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-storybook": "10.6.0",
+    "eslint-plugin-testing-library": "7.16.2",
+    "knip": "6.38.0",
+    "motion-dom": "13.4.2",
+    "msw": "2.15.0",
+    "playwright": "1.63.0",
+    "storybook": "10.6.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vitest": "4.1.11",
+    "vitest-browser-react": "2.3.0"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

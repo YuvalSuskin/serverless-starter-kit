@@ -1,0 +1,14 @@
+[
+  {
+    "key": "explain-before-infra",
+    "text": "Owner preference: before changing the platform (<platform-resources>), anything in prod or management, or adding anything billed while idle, explain what and why and wait for the owner's go-ahead; 'sounds good' to a summary is not a go-ahead. Otherwise in <dev-stage-name> agents have full autonomy (deploy, pay-per-use resources of any kind, dev secrets)."
+  },
+  {
+    "key": "owner-inbox",
+    "text": "Owner preference: anything that needs the owner (a step only they can do, or a decision) goes on the owner's inbox page <owner-inbox-url> (db collections: items = what is asked, answers/{itemId} = {choice, note, updatedAt}), so they answer without interrupting the conversation. Add an item with ArtifactData set on items; read answers back and act on them; set hidden:true on an item once handled."
+  },
+  {
+    "key": "project-accounts-only",
+    "text": "Owner rule: for anything the project owns (cloud, sign-in clients, search console, workspace, any third-party service), use only the project's own account (<project-account>), never the owner's personal accounts. One exception, if the bootstrap recorded one: <registrar-exception>. In the owner's browser, switch to the project's account before acting; if it isn't signed in, ask the owner to sign in."
+  }
+]

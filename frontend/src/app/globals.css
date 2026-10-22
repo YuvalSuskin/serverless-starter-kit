@@ -1,0 +1,143 @@
+@import "tailwindcss";
+@import "@acme/design/tokens.css";
+
+/*
+ * Design tokens -> Tailwind. The values live in design/tokens/tokens.json;
+ * this file only maps names. Type and radius scales are REPLACED, not
+ * extended: `text-sm` and `rounded-md` must not exist, so the sqrt(2) scale
+ * and the radii are the only ones available.
+ *
+ * The font stack is tokens.css's --font-ui; the face itself is declared by the
+ * Fontsource package that fonts.ts imports. Names here avoid --font-ui:
+ * redefining it inside @theme would make it self-referential.
+ */
+@theme inline {
+  --color-grey-50: var(--grey-50);
+  --color-grey-100: var(--grey-100);
+  --color-grey-200: var(--grey-200);
+  --color-grey-300: var(--grey-300);
+  --color-grey-500: var(--grey-500);
+  --color-grey-700: var(--grey-700);
+  --color-grey-900: var(--grey-900);
+  /* The one accent: focus ring, links, the active item */
+  --color-brand: var(--brand);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-soft: var(--soft);
+
+  --color-ok: var(--ok-fg);
+  --color-ok-surface: var(--ok-bg);
+  --color-info: var(--info-fg);
+  --color-info-surface: var(--info-bg);
+  --color-warn: var(--warn-fg);
+  --color-warn-surface: var(--warn-bg);
+  --color-err: var(--err-fg);
+  --color-err-surface: var(--err-bg);
+  --color-draft: var(--draft-fg);
+  --color-draft-surface: var(--draft-bg);
+
+  /* shadcn semantic names, mapped onto the tokens */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--panel);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--grey-900);
+  --color-primary-foreground: var(--grey-50);
+  --color-secondary: var(--grey-100);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--soft);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--soft);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--err-fg);
+  --color-destructive-foreground: var(--panel);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--brand);
+
+  --font-*: initial;
+  --font-sans: var(--font-ui);
+
+  --text-*: initial;
+  /* 050 and 075 are small UI steps (D2): captions and labels, never on inputs */
+  --text-050: var(--size-050);
+  --text-075: var(--size-075);
+  --text-100: var(--size-100);
+  --text-200: var(--size-200);
+  --text-300: var(--size-300);
+  --text-400: var(--size-400);
+  --text-500: var(--size-500);
+
+  --radius-*: initial;
+  --radius-card: var(--r-card);
+  --radius-input: var(--r-input);
+  --radius-photo: var(--r-photo);
+  --radius-pill: var(--r-pill);
+
+  /* Motion: tokens.css emits --motion-{fast,base,slow,ease} at :root;
+     transition-ui and transition-fade reference them directly without remapping. */
+}
+
+@layer base {
+  body {
+    @apply bg-background font-sans text-foreground;
+  }
+}
+
+/*
+ * Motion utilities (design/tokens "motion").
+ * transition-ui covers interactive state changes (color, background, border, shadow, opacity).
+ * transition-fade covers opacity-only reveals and exits.
+ * Under prefers-reduced-motion: reduce, transitions are removed.
+ */
+@utility transition-ui {
+  transition-duration: var(--motion-base);
+  transition-timing-function: var(--motion-ease);
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+}
+
+@utility transition-fade {
+  transition-duration: var(--motion-base);
+  transition-timing-function: var(--motion-ease);
+  transition-property: opacity;
+}
+
+/* The card of Dialog and ConfirmDialog: as tall as its content, centred, and
+   1rem from the screen's edges all round: a long body scrolls inside the card, so a phone never gets a card that is the whole screen.
+   Utilities, not spelled in each dialog's script (a page that loads Dialog has
+   a tight script budget). */
+@utility dialog-card {
+  @apply fixed inset-4 m-auto h-fit max-h-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-card bg-panel p-6 text-foreground shadow-2xl;
+}
+
+@utility dialog-card-wide {
+  @apply fixed inset-4 m-auto h-fit max-h-[calc(100%-2rem)] max-w-5xl overflow-y-auto rounded-card bg-panel p-6 text-foreground shadow-2xl;
+}
+
+@utility dialog-card-sm {
+  @apply fixed inset-4 m-auto h-fit max-h-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-card bg-panel p-6 text-foreground shadow-2xl;
+}
+
+/* A full-screen dialog: the card is the viewport, with no
+   frame. It stands alone, not beside dialog-card. */
+@utility dialog-card-full {
+  @apply fixed inset-0 flex flex-col overflow-hidden bg-panel text-foreground;
+}
+
+/* The same, only below lg: from lg up the usual centred card, its body
+   scrolling in its own region. */
+@utility dialog-card-phone {
+  @apply fixed inset-0 flex flex-col overflow-hidden bg-panel text-foreground lg:inset-4 lg:m-auto lg:h-fit lg:max-h-[calc(100%-2rem)] lg:max-w-3xl lg:rounded-card lg:shadow-2xl;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-ui {
+    transition: none;
+  }
+
+  .transition-fade {
+    transition: none;
+  }
+}

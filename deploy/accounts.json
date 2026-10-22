@@ -1,0 +1,8 @@
+{
+  "region": null,
+  "domain": null,
+  "stages": {
+    "dev": { "account": null },
+    "production": { "account": null }
+  }
+}
