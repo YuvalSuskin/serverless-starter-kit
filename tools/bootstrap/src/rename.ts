@@ -11,6 +11,8 @@ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmdirSy
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { dropTrackerRemote, remoteLines } from "./tracker-config.ts";
+
 const PLACEHOLDER = "acme";
 
 /** The root file whose presence means "the template, not yet renamed". */
@@ -45,57 +47,6 @@ function repoKey(url: string): string {
     .filter((part) => part !== "")
     .toReversed();
   return `${owner}/${name.endsWith(".git") ? name.slice(0, -4) : name}`.toLowerCase();
-}
-
-const VALUE = String.raw`[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#]*))`;
-const FLAT_REMOTE = new RegExp(`^sync\\.remote:${VALUE}`);
-const NESTED_REMOTE = new RegExp(`^[ \\t]+remote:${VALUE}`);
-const SYNC = /^sync:[ \t]*(?:#.*)?$/;
-const TOP_LEVEL = /^[^\s#]/;
-const INDENTED = /^[ \t]+[^\s#]/;
-
-/**
- * Lines (1-based) of a config that look like a remote, read without parsing
- * the YAML: a second net for what `dropTrackerRemote` cannot read (flow
- * style, CRLF line ends).
- */
-function remoteLines(text: string): number[] {
-  return text.split("\n").flatMap((line, i) => {
-    const code = line.trimStart();
-    return !code.startsWith("#") && /remote\s*:/.test(code) ? [i + 1] : [];
-  });
-}
-
-/**
- * `.beads/config.yaml` without its tracker remote: `remote:` under a
- * top-level `sync:` (dropped with it when nothing else is under it), or a flat
- * `sync.remote:` key. Returns the remote it removed and its line (1-based), if
- * any. The text is edited line by line, not re-serialised, so its comments stay.
- */
-export function dropTrackerRemote(text: string): {
-  line: number;
-  remote: string | undefined;
-  text: string;
-} {
-  const lines = text.split("\n");
-  const sync = lines.findIndex((line) => SYNC.test(line));
-  // A new top-level key ends the block; a comment or a blank line does not.
-  const after = lines.findIndex((line, i) => sync >= 0 && i > sync && TOP_LEVEL.test(line));
-  const inBlock = (i: number) => sync >= 0 && i > sync && (after < 0 || i < after);
-  const at = lines.findIndex(
-    (line, i) => FLAT_REMOTE.test(line) || (inBlock(i) && NESTED_REMOTE.test(line)),
-  );
-  const match = FLAT_REMOTE.exec(lines[at] ?? "") ?? NESTED_REMOTE.exec(lines[at] ?? "");
-  if (match === null) return { line: 0, remote: undefined, text };
-
-  const drop = new Set([at]);
-  const holdsMore = lines.some((line, i) => i !== at && inBlock(i) && INDENTED.test(line));
-  if (inBlock(at) && !holdsMore) drop.add(sync);
-  return {
-    line: at + 1,
-    remote: match[1] ?? match[2] ?? match[3] ?? "",
-    text: lines.filter((_, i) => !drop.has(i)).join("\n"),
-  };
 }
 
 /** The settings file with the guarded hook made plain; the JSON text is edited, not re-serialised. */

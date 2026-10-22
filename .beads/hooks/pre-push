@@ -137,12 +137,16 @@ fi
 # this, your issues silently stay on your machine while your code ships, and
 # nothing anywhere reports a problem.
 #
+# --no-adopt: the issues go only to a remote the owner set (bootstrap step 1
+# or 3). With none, bd sync skips; it never derives one from git's origin, which
+# would publish the whole tracker without the owner's say (TB143).
+#
 # Escape hatch, for offline work or a broken remote:
 #   BEADS_SKIP_SYNC=1 git push
 if [ -z "$BEADS_SKIP_SYNC" ] && [ -z "$ACME_SYNCING" ] && command -v bd >/dev/null 2>&1; then
   export ACME_SYNCING=1          # belt and braces against re-entry
   echo "beads: syncing issues before push..."
-  if bd sync; then
+  if bd sync --no-adopt; then
     :
   else
     _bd_sync_exit=$?

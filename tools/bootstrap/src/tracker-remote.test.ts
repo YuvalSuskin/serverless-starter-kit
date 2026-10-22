@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { finishSteps, type RunResult, runSteps } from "./finish.ts";
 import { MARKER, renameProject } from "./rename.ts";
+import { removeTrackerRemote } from "./tracker-config.ts";
 
 /** The template's bead prefix: the placeholder, read off the marker's name. */
 const TEMPLATE_PREFIX = MARKER.slice(1, -"-template".length);
@@ -120,7 +121,8 @@ function copy(name: string, opts: { origin?: string; remote?: string }): string 
   const sync = opts.remote === undefined ? "" : `sync:\n    remote: "${opts.remote}"\n`;
   write(root, {
     [MARKER]: "Not yet renamed.\n",
-    ".beads/config.yaml": `issue-prefix: ${TEMPLATE_PREFIX}\n${sync}`,
+    // As the template's: bd exports every change to .beads/issues.jsonl.
+    ".beads/config.yaml": `issue-prefix: ${TEMPLATE_PREFIX}\nexport:\n    auto: true\n${sync}`,
     ".beads/seed-memories.json": JSON.stringify([{ key: "seed", text: "A seed memory." }]),
     [RESEARCH]: `# Research\n\n${header("inherited research")}\n\nBody.\n`,
     [SWEEP]: `# Sweep\n\n${header("inherited design")}\n\nBody.\n`,
@@ -137,6 +139,19 @@ function trackerSteps(root: string) {
   return { ...runSteps(steps, (line) => logs.push(line)), logs };
 }
 
+/** The pre-push hook's bd sync, as the hook runs it (read from the hook itself). */
+const HOOK_SYNC = (() => {
+  const hook = readFileSync(
+    path.resolve(import.meta.dirname, "../../../.beads/hooks/pre-push"),
+    "utf8",
+  );
+  const line = hook.split("\n").find((l) => l.trim().startsWith("if bd sync"));
+  if (line === undefined) throw new Error(".beads/hooks/pre-push runs no `if bd sync…; then`");
+  const [command = ""] = line.trim().slice("if ".length).split(";");
+  return command.split(" ").slice(1);
+})();
+const hookSync = (root: string) => runIn(root)("bd", HOOK_SYNC).status;
+
 const ids = (root: string) =>
   (JSON.parse(must(root, "bd", ["list", "--all", "--json"])) as { id: string }[]).map(
     (bead) => bead.id,
@@ -147,7 +162,7 @@ describe("pnpm rename, in a copy whose tracker config names the template's remot
     const root = copy("copy", { remote: remoteUrl });
     await renameProject(root, { display: "Demo", slug: "demo" });
     expect(readFileSync(path.join(root, ".beads/config.yaml"), "utf8")).toBe(
-      "issue-prefix: demo\n",
+      "issue-prefix: demo\nexport:\n    auto: true\n",
     );
 
     const { ok, report } = trackerSteps(root);
@@ -183,22 +198,70 @@ describe("pnpm rename, in a copy whose git origin carries the template's tracker
     // No anchor was filed into the adopted tracker.
     expect(ids(root).every((id) => id.startsWith(`${TEMPLATE_PREFIX}-`))).toBe(true);
     expect(readFileSync(path.join(root, SWEEP), "utf8")).toContain("**Beads:** `demo-tf8`");
-  }, 120_000);
+
+    // The printed recovery, then pnpm rename --resume: a fresh tracker this time,
+    // though bd exported the adopted issues to .beads/issues.jsonl meanwhile.
+    expect(first).toContain("rm -rf .beads/embeddeddolt .beads/dolt");
+    expect(first).toContain("git remote remove origin");
+    rmSync(path.join(root, ".beads/embeddeddolt"), { force: true, recursive: true });
+    rmSync(path.join(root, ".beads/dolt"), { force: true, recursive: true });
+    must(root, "git", ["remote", "remove", "origin"]);
+    const resumed = trackerSteps(root);
+    expect(resumed.report).toBe("");
+    expect(resumed.ok).toBe(true);
+    const filed = ids(root);
+    expect(filed).toHaveLength(2);
+    for (const id of filed) expect(id).toMatch(/^demo-/);
+    expect(readFileSync(path.join(root, SWEEP), "utf8")).not.toContain("`demo-tf8`");
+  }, 180_000);
 });
 
-describe("pnpm rename, in a copy whose git origin is the project's own, empty repository", () => {
-  // GitHub's "Use this template": bd init sets the origin as the tracker's remote, and pushes nothing.
-  it("starts a fresh tracker and says which remote bd set", async () => {
-    const own = path.join(base, "own.git");
+describe("pnpm rename, in a copy whose git origin is the project's own repository", () => {
+  // GitHub's "Use this template": the project's repository holds its code and no
+  // tracker. bd init sets it as the tracker's remote and pushes nothing, so the
+  // pre-push hook's bd sync fails until the owner keeps the remote (bd dolt
+  // push, once) or removes it.
+  async function ownCopy(name: string): Promise<{ own: string; root: string }> {
+    const own = path.join(base, `${name}.git`);
     must(base, "git", ["init", "-q", "--bare", own]);
-    const root = copy("own", { origin: own });
+    const root = copy(name, { origin: own });
+    must(root, "git", ["push", "-q", "origin", "main"]);
     await renameProject(root, { display: "Demo", slug: "demo" });
-
     const { logs, ok, report } = trackerSteps(root);
     expect(report).toBe("");
     expect(ok).toBe(true);
-    expect(logs[0]).toContain(`bd set git's origin as its remote (${own})`);
+    expect(logs[0]).toContain(`bd set git's origin as its remote (${own}) and pushed nothing`);
     for (const id of ids(root)) expect(id).toMatch(/^demo-/);
-    expect(must(base, "git", ["ls-remote", own])).toBe("");
-  }, 120_000);
+    expect(must(base, "git", ["ls-remote", own, "refs/dolt/data"])).toBe("");
+    // Nothing in refs/dolt/data yet: the hook's sync fails, so git push would stop.
+    expect(hookSync(root)).not.toBe(0);
+    return { own, root };
+  }
+
+  it("keeps it: bd dolt push once, then bd sync passes", async () => {
+    const { own, root } = await ownCopy("own-keep");
+    must(root, "bd", ["dolt", "push"]);
+    expect(must(base, "git", ["ls-remote", own, "refs/dolt/data"])).toContain("refs/dolt/data");
+    expect(hookSync(root)).toBe(0);
+  }, 180_000);
+
+  it("removes it (pnpm tracker:drop-remote), from the nested form bd wrote: then bd sync passes", async () => {
+    const { root } = await ownCopy("own-drop");
+    const config = path.join(root, ".beads/config.yaml");
+    expect(readFileSync(config, "utf8")).toMatch(/^sync:\n {4}remote: /m);
+    const { done, left } = removeTrackerRemote(root, runIn(root));
+    expect(left).toEqual([]);
+    expect(done).toHaveLength(2);
+    expect(readFileSync(config, "utf8")).not.toMatch(/remote/);
+    const value = (
+      JSON.parse(must(root, "bd", ["config", "get", "sync.remote", "--json"])) as { value: string }
+    ).value;
+    expect(value).toBe("");
+    expect(JSON.parse(must(root, "bd", ["dolt", "remote", "list", "--json"]))).toEqual([]);
+    // The hook's sync skips, never deriving a remote from git's origin.
+    expect(hookSync(root)).toBe(0);
+    expect(
+      must(base, "git", ["ls-remote", path.join(base, "own-drop.git"), "refs/dolt/data"]),
+    ).toBe("");
+  }, 180_000);
 });

@@ -23,6 +23,7 @@
     "preview": "node tools/preview/src/cli.ts",
     "rename": "node tools/bootstrap/src/cli.ts",
     "bootstrap:state": "node tools/bootstrap/src/state-cli.ts",
+    "tracker:drop-remote": "node tools/bootstrap/src/drop-remote.ts",
     "competitors": "node tools/competitors/src/cli.ts",
     "review-batch": "node tools/review-batch/src/cli.ts",
     "sweep": "node tools/sweep/src/cli.ts",

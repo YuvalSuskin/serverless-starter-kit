@@ -49,6 +49,18 @@ already answers.
   a tracker database something else created (the beads MCP server, a `bd`
   command run by hand) is set aside by the rename when it is empty (no issue,
   no memory, no prefix of its own) and stops it otherwise.
+- **The tracker's remote,** right after the rename, only when it reported
+  "bd set git's origin as its remote" (the copy came with a git `origin`, as
+  GitHub's "Use this template" leaves it): settle it before the first
+  `git push`, since until the remote holds the tracker the pre-push hook's
+  `bd sync` fails and stops every push. Name the URL and ask whether it is the
+  project's own repository and to keep it. Keeping it pushes the issues and
+  memories to `refs/dolt/data` there: state that, wait for yes, then run
+  `bd dolt push` once. Otherwise, or for a remote that is not the project's
+  own, run `pnpm tracker:drop-remote` (it removes `sync.remote` and the Dolt
+  remote and checks nothing is left; the hook's `bd sync --no-adopt` then
+  skips) and commit `.beads/config.yaml`; step 3 sets a remote later. Record
+  which in a BS row.
 - **The README** (`README.md`): the title becomes the display name and the
   opening paragraph, which describes the template, becomes the one-sentence
   description and a line saying the project started from the template.
@@ -84,7 +96,8 @@ product docs in step 2; this step records them only.
 
 - BS rows: the name and slug; the domain (provisional or registered); the
   language and direction; the market; the region, and the data rule with its
-  source, or "no binding rule: one region by A3".
+  source, or "no binding rule: one region by A3"; the tracker's remote bd set
+  from git's `origin`, kept or removed, when the rename reported one.
 - If the data rule is stricter than the guardrail (it names services or
   copies the guardrail cannot stop, such as CloudFront's edge caches), a row
   saying so and a bead for the gap, labelled for the next review batch

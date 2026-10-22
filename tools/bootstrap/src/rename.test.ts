@@ -370,6 +370,14 @@ describe("leftovers", () => {
     );
   });
 
+  it("names no line that only mentions a remote (another key, or a value)", async () => {
+    const root = fixture();
+    await renameProject(root, { display: "Demo", slug: "demo" });
+    const extra = 'git-remote: x\ndescription: "has remote: in it"\nbackup:\n    git-remote: y\n';
+    write(root, { ".beads/config.yaml": `${read(root, ".beads/config.yaml")}${extra}` });
+    expect(leftovers(root, { installed: false })).toEqual([]);
+  });
+
   it("names the template's repository in a tracked file", async () => {
     const root = fixture();
     await renameProject(root, { display: "Demo", slug: "demo" });
@@ -427,43 +435,71 @@ describe("renameProject, to a hyphenated slug", () => {
 });
 
 // The real template, as a new project gets it. A renamed project has no
-// marker, so there the test has nothing to rename and skips.
+// marker: there the same copy must refuse a second rename, and nothing skips.
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))(
-  "renameProject on this repo's HEAD",
-  () => {
-    it("leaves no placeholder outside the allowlist, and every package name valid", async () => {
-      const copy = tempDir();
-      const tar = path.join(copy, ".head.tar");
-      git(repoRoot, "archive", "--format=tar", "-o", tar, "HEAD");
-      execFileSync("tar", ["-xf", tar, "-C", copy]);
-      rmSync(tar);
-      initRepo(copy);
-      commitAll(copy);
+const isTemplate = existsSync(path.join(repoRoot, MARKER));
 
-      const report = await renameProject(copy, { display: "Demo", slug: "demo" });
+/** A committed `git archive HEAD` copy of this repo. */
+function headCopy(): string {
+  const copy = tempDir();
+  const tar = path.join(copy, ".head.tar");
+  git(repoRoot, "archive", "--format=tar", "-o", tar, "HEAD");
+  execFileSync("tar", ["-xf", tar, "-C", copy]);
+  rmSync(tar);
+  initRepo(copy);
+  commitAll(copy);
+  return copy;
+}
 
-      expect(report.filesChanged).toBeGreaterThan(100);
-      expect(read(copy, ".claude/settings.json")).toContain(JSON.stringify(PRIME));
-      expect(read(copy, ".claude/settings.json")).not.toContain("test -e");
-      // The template ships the bootstrap's state, every step pending; the rename keeps it.
-      expect(JSON.parse(read(copy, ".bootstrap/state.json"))).toEqual({ steps: {} });
-      expect(git(copy, "ls-files", ".bootstrap/state.json").trim()).toBe(".bootstrap/state.json");
-      expect(leftovers(copy, { installed: false })).toEqual([]);
-      const manifests = git(copy, "ls-files", "package.json", "*/package.json").trim().split("\n");
-      expect(manifests.length).toBeGreaterThan(5);
-      for (const file of manifests) {
-        const { name } = JSON.parse(read(copy, file)) as { name?: unknown };
-        expect(validNpmName(name), `${file}: ${String(name)}`).toBe(true);
-        expect(String(name)).toMatch(/^(@demo\/[a-z-]+|demo)$/);
-      }
-    });
-  },
-);
+const ESCAPED_MARKER = MARKER.replaceAll(".", "\\.");
+const MARKER_MISSING = new RegExp(`${ESCAPED_MARKER} is missing`);
+
+/** The template: its HEAD, renamed in a copy, is clean. */
+async function checkTemplateHead(): Promise<void> {
+  const copy = headCopy();
+  const report = await renameProject(copy, { display: "Demo", slug: "demo" });
+
+  expect(report.filesChanged).toBeGreaterThan(100);
+  expect(read(copy, ".claude/settings.json")).toContain(JSON.stringify(PRIME));
+  expect(read(copy, ".claude/settings.json")).not.toContain("test -e");
+  // The template ships the bootstrap's state, every step pending; the rename keeps it.
+  expect(JSON.parse(read(copy, ".bootstrap/state.json"))).toEqual({ steps: {} });
+  expect(git(copy, "ls-files", ".bootstrap/state.json").trim()).toBe(".bootstrap/state.json");
+  expect(leftovers(copy, { installed: false })).toEqual([]);
+  const manifests = git(copy, "ls-files", "package.json", "*/package.json").trim().split("\n");
+  expect(manifests.length).toBeGreaterThan(5);
+  for (const file of manifests) {
+    const { name } = JSON.parse(read(copy, file)) as { name?: unknown };
+    expect(validNpmName(name), `${file}: ${String(name)}`).toBe(true);
+    expect(String(name)).toMatch(/^(@demo\/[a-z-]+|demo)$/);
+  }
+}
+
+/**
+ * A named project: a second rename is refused, changing nothing. The marker
+ * check comes before any write, so this runs on the project itself (in
+ * check:full's renamed copy the rename is not committed yet, so HEAD is
+ * still the template's).
+ */
+async function checkSecondRenameRefused(): Promise<void> {
+  const before = git(repoRoot, "status", "--porcelain");
+  await expect(renameProject(repoRoot, { display: "Shop", slug: "shop" })).rejects.toThrow(
+    MARKER_MISSING,
+  );
+  expect(git(repoRoot, "status", "--porcelain")).toBe(before);
+}
+
+// One test for both modes: nothing here skips, in the template or in a project.
+describe("renameProject on this repo", () => {
+  it("renames the template's HEAD clean; a named project refuses a second rename, changing nothing", async () => {
+    expect.hasAssertions();
+    await (isTemplate ? checkTemplateHead() : checkSecondRenameRefused());
+  });
+});
 
 // Claude Code's SessionStart hook, run as Claude Code runs it: by a shell, in
 // the project, with CLAUDE_PROJECT_DIR set. A stand-in bd records each call.
-describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))("the SessionStart hook", () => {
+describe("the SessionStart hook", () => {
   const hookCommand = () => {
     const parsed = JSON.parse(read(repoRoot, ".claude/settings.json")) as {
       hooks: { SessionStart: { hooks: { command: string }[] }[] };
@@ -485,8 +521,8 @@ describe.skipIf(!existsSync(path.join(repoRoot, MARKER)))("the SessionStart hook
     return existsSync(log) ? read(bin, "calls").trim().split("\n") : [];
   };
 
-  it("is the guarded bd prime in the template", () => {
-    expect(hookCommand()).toEqual([PRIME_GUARDED]);
+  it("is the guarded bd prime in the template, and plain bd prime once renamed", () => {
+    expect(hookCommand()).toEqual([isTemplate ? PRIME_GUARDED : PRIME]);
   });
 
   const PRIMED = [`bd ${PRIME.slice(3)}`];

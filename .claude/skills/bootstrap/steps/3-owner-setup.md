@@ -40,24 +40,21 @@ One question per message, in this order.
    (`<registrar-exception>`); none is the usual answer.
 6. **Go-ahead to publish the inbox page:** a private claude.ai page only the
    owner sees until they share it.
-7. **Go-ahead for the tracker's remote,** once the repository exists: state
-   that the issues and memories will be pushed to `refs/dolt/data` on that
-   repository (where `bd dolt pull` finds them on another machine), with the
-   commands below, and wait for yes. The rename removed the template's own
-   tracker remote from `.beads/config.yaml`. If the copy already had a git
-   `origin` when `pnpm rename` ran (GitHub's "Use this template"), `bd init`
-   set that origin as the tracker's remote, and `pnpm rename` said so; nothing
-   was pushed. Read `.beads/config.yaml`'s `sync.remote` and `bd dolt remote
-   list`, and say which case it is: no remote yet, or the project's own
-   repository already set, asking to keep it. A remote that is not the
-   project's own repository is never kept.
+7. **Go-ahead for the tracker's remote,** once the repository exists and the
+   tracker has no remote yet (`bd dolt remote list` shows none and
+   `.beads/config.yaml` names no `sync.remote`; a remote `bd init` set from
+   git's `origin` was settled in step 1): state that the issues and memories
+   will be pushed to `refs/dolt/data` on that repository (where `bd dolt
+   pull` finds them on another machine), with the commands below, and wait
+   for yes. If a remote is set that is not the project's own repository, say
+   so: it is removed, never kept.
 
 ## Writes
 
 - **The repository,** if asked for (question 2), and its remote as
   `origin`.
 - **The tracker's remote,** after the yes (question 7), with the project's
-  own repository and never the template's. With none set yet:
+  own repository and never the template's:
 
   ```bash
   bd config set sync.remote "git+https://github.com/<owner>/<name>.git"
@@ -65,15 +62,12 @@ One question per message, in this order.
   bd dolt push
   ```
 
-  With the project's own repository already set by `bd init`: `bd dolt push`
-  only. `bd config set` writes `sync.remote` into `.beads/config.yaml`; commit
-  that change. Without a yes, or for a remote that is not the project's own,
-  remove it so the tracker stays local, and a bead says the step is left:
-
-  ```bash
-  bd dolt remote remove origin
-  bd config unset sync.remote
-  ```
+  `bd config set` writes `sync.remote` into `.beads/config.yaml`; commit that
+  change. Without a yes the tracker stays local and a bead says the step is
+  left. A remote that is not the project's own goes with
+  `pnpm tracker:drop-remote` (never `bd config unset sync.remote`, which
+  leaves the `sync:` / `remote:` form in place); it says what it removed and
+  checks nothing is left.
 - **The branch rule,** after the yes (question 3):
 
   ```bash

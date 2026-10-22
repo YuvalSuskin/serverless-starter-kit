@@ -36,7 +36,7 @@ function summary(report: RenameReport): string {
   ];
   if (report.trackerRemote !== undefined) {
     lines.push(
-      `Removed the template's tracker remote from .beads/config.yaml (${report.trackerRemote}): bd init starts a fresh tracker. Bootstrap step 3 settles the project's own remote with the owner.`,
+      `Removed the template's tracker remote from .beads/config.yaml (${report.trackerRemote}): bd init starts a fresh tracker. The project's own remote is the owner's call (bootstrap step 1 or 3).`,
     );
   }
   if (report.thirdParty.length > 0) {
