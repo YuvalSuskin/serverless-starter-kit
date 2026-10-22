@@ -18,7 +18,7 @@
     "eslint": "10.11.0",
     "knip": "6.38.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "playwright": "1.63.0",
